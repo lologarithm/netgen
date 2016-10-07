@@ -1,0 +1,25 @@
+package netmsg
+
+struct Multipart {
+    ID  uint16
+ GroupID uint32
+ NumParts uint16
+ Content []byte
+}
+
+struct Heartbeat {
+ Time int64
+ Latency int64
+}
+
+struct Connected {
+  TestEnumField Test
+}
+
+struct Disconnected {
+}
+
+enum Test {
+    A = 0
+    B = 1
+}
