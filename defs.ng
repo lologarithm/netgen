@@ -26,13 +26,11 @@ struct SubNest2 {
 }
 
 struct Connected {
-  TestEnumField Test
+  Awesomeness Level
 }
 
-struct Disconnected {
-}
-
-enum Test {
-    A = 0
-    B = 1
+enum Level {
+    PrettyLow = 0
+    PrettyOk = 1
+    PrettyAwesome = 2
 }

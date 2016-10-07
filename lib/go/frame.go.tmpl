@@ -1,5 +1,5 @@
 type Net interface {
-	Serialize([]byte) 
+	Serialize([]byte)
 	Len() int
 }
 
@@ -21,18 +21,18 @@ type Packet struct {
 }
 
 // Pack serializes the content into RawBytes.
-func (m *Packet) Pack() []byte {
-	buf := make([]byte, m.Len())
-	binary.LittleEndian.PutUint16(buf, uint16(m.Frame.MsgType))
-	binary.LittleEndian.PutUint16(buf[2:], m.Frame.Seq)
-	binary.LittleEndian.PutUint16(buf[4:], m.Frame.ContentLength)
-	m.NetMsg.Serialize(buf[6:])
+func (p *Packet) Pack() []byte {
+	buf := make([]byte, p.Len())
+	binary.LittleEndian.PutUint16(buf, uint16(p.Frame.MsgType))
+	binary.LittleEndian.PutUint16(buf[2:], p.Frame.Seq)
+	binary.LittleEndian.PutUint16(buf[4:], p.Frame.ContentLength)
+	p.NetMsg.Serialize(buf[6:])
 	return buf
 }
 
 // Len returns the total length of the message including the frame
-func (m *Packet) Len() int {
-	return int(m.Frame.ContentLength) + FrameLen
+func (p *Packet) Len() int {
+	return int(p.Frame.ContentLength) + FrameLen
 }
 
 type Frame struct {
