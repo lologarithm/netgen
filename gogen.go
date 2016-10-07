@@ -33,17 +33,16 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 	// 1.a. Parent parser function
 	gobuf.WriteString("// ParseNetMessage accepts input of raw bytes from a NetMessage. Parses and returns a Net message.\n")
 	gobuf.WriteString("func ParseNetMessage(packet Packet, content []byte) Net {\n")
-	gobuf.WriteString("\tvar msg Net\n")
 	gobuf.WriteString("\tswitch packet.Frame.MsgType {\n")
 	for _, t := range messages {
 		gobuf.WriteString("\tcase ")
 		gobuf.WriteString(t.Name)
 		gobuf.WriteString("MsgType:\n")
-		gobuf.WriteString("\t\tmsg = &")
+		gobuf.WriteString("\t\tmsg := ")
 		gobuf.WriteString(t.Name)
-		gobuf.WriteString("{}\n")
+		gobuf.WriteString("Deserialize(content)\n\t\treturn &msg\n")
 	}
-	gobuf.WriteString("\tdefault:\n\t\tfmt.Printf(\"Unknown message type: %d\\n\", packet.Frame.MsgType)\n\t\treturn nil\n\t}\n\tmsg.Deserialize(content)\n\treturn msg\n}\n\n")
+	gobuf.WriteString("\tdefault:\n\t\tfmt.Printf(\"Unknown message type: %d\\n\", packet.Frame.MsgType)\n\t\treturn nil\n\t}\n}\n\n")
 
 	for _, enum := range enums {
 		gobuf.WriteString("type ")
@@ -69,13 +68,15 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 			gobuf.WriteString("\n\t")
 			gobuf.WriteString(f.Name)
 			gobuf.WriteString(" ")
+			if f.Pointer {
+				gobuf.WriteString("*")
+			}
 			gobuf.WriteString(f.Type)
 		}
 		gobuf.WriteString("\n}\n\n")
-		gobuf.WriteString("func ")
+		gobuf.WriteString("func (m ")
 		gobuf.WriteString(msg.Name)
-		gobuf.WriteString("Serialize(buffer []byte) (buffer []byte) {\n\t"
-		// TODO FINISH CONVERTING TO STATIC METHODS(idx := 0\n")
+		gobuf.WriteString(") Serialize(buffer []byte) {\n\tidx := 0\n")
 		for _, f := range msg.Fields {
 			WriteGoSerialize(f, 1, gobuf, messageMap, enumMap)
 		}
@@ -84,16 +85,16 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 
 		gobuf.WriteString("func ")
 		gobuf.WriteString(msg.Name)
-		gobuf.WriteString("Deserialize(buffer []byte) ")
+		gobuf.WriteString("Deserialize(buffer []byte) (m ")
 		gobuf.WriteString(msg.Name)
-		gobuf.WriteString(" {\n\tidx := 0\n")
+		gobuf.WriteString(") {\n\tidx := 0\n")
 		for _, f := range msg.Fields {
 			WriteGoDeserial(f, 1, gobuf, messageMap, enumMap)
 		}
 		// cause im lazy.
-		gobuf.WriteString("\n\t_ = idx\n}\n\n")
+		gobuf.WriteString("\n\t_ = idx\n\treturn m\n}\n\n")
 
-		gobuf.WriteString("func (m *")
+		gobuf.WriteString("func (m ")
 		gobuf.WriteString(msg.Name)
 		gobuf.WriteString(") Len() int {\n\tmylen := 0\n")
 		for _, f := range msg.Fields {
@@ -428,22 +429,31 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 			buf.WriteString("}\n")
 		} else if _, ok := messages[f.Type]; ok {
 			// 	// Custom message deserial here.
-			if scopeDepth == 1 {
-				buf.WriteString("m.")
+			if f.Pointer {
+				buf.WriteString("var sub")
+				buf.WriteString(f.Name)
+				buf.WriteString(" = ")
+				buf.WriteString(f.Type)
+				buf.WriteString("Deserialize(buffer[idx:])\n")
+				for i := 0; i < scopeDepth; i++ {
+					buf.WriteString("\t")
+				}
+				if scopeDepth == 1 {
+					buf.WriteString("m.")
+				}
+				buf.WriteString(f.Name)
+				buf.WriteString(" = &sub")
+				buf.WriteString(f.Name)
+				buf.WriteString("\n")
+			} else {
+				if scopeDepth == 1 {
+					buf.WriteString("m.")
+				}
+				buf.WriteString(f.Name)
+				buf.WriteString(" = ")
+				buf.WriteString(f.Type[0:])
+				buf.WriteString("Deserialize(buffer[idx:])\n")
 			}
-			buf.WriteString(f.Name)
-			buf.WriteString(" = new(")
-			buf.WriteString(f.Type[0:])
-			buf.WriteString(")\n")
-
-			for i := 0; i < scopeDepth; i++ {
-				buf.WriteString("\t")
-			}
-			if scopeDepth == 1 {
-				buf.WriteString("m.")
-			}
-			buf.WriteString(f.Name)
-			buf.WriteString(".Deserialize(buffer[idx:])\n")
 			for i := 0; i < scopeDepth; i++ {
 				buf.WriteString("\t")
 			}
