@@ -62,6 +62,10 @@ func main() {
 					Type:  parts[1],
 					Order: len(message.Fields),
 				}
+				if field.Type[0] == '*' {
+					field.Type = field.Type[1:]
+					field.Pointer = true
+				}
 				switch field.Type {
 				case "byte":
 					field.Size = 1
@@ -120,8 +124,9 @@ type EnumValue struct {
 
 // MessageField is a single field of a message.
 type MessageField struct {
-	Name  string
-	Type  string
-	Order int
-	Size  int
+	Name    string
+	Type    string
+	Pointer bool
+	Order   int
+	Size    int
 }

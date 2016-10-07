@@ -12,6 +12,19 @@ struct Heartbeat {
  Latency int64
 }
 
+struct Nested {
+  A SubNest
+  B *SubNest2
+}
+
+struct SubNest {
+ B int
+}
+
+struct SubNest2 {
+
+}
+
 struct Connected {
   TestEnumField Test
 }
