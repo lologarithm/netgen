@@ -59,7 +59,8 @@ if packet.Frame.MsgType == netmsg.MyMessageType {
 }
 
 // Now later you want to respond on the socket.
-packet := NewPacket(netmsg.MyResponse, &netmsg.MyResponse{
+// First create a packet with your message
+packet := netmsg.NewPacket(netmsg.MyResponse, &netmsg.MyResponse{
     AString: "a response message",
     AValue: 100,
 })
