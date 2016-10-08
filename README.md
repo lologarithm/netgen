@@ -49,23 +49,25 @@ netgen mydefs.ng
 ```
 
 Now in code you could do this:
-```
+```go
 packet, ok := netmsg.NextPacket(buffer) // buffer is assumed to have been read off socket
 
 // You can now check the type
-if packet.Frame.MsgType == netmsg.MyMessageType {
+switch msg := packet.NetMsg.(type) {
+case netmsg.MyRequest:
     // Process the message!
-    ProcessMyMessage(packet.NetMsg.(*netmsg.MyMessage))
+    ProcessMyMessage(msg)
 }
 
 // Now later you want to respond on the socket.
+
 // First create a packet with your message
-packet := netmsg.NewPacket(netmsg.MyResponse, &netmsg.MyResponse{
+packet := netmsg.NewPacket(&netmsg.MyResponse{
     AString: "a response message",
     AValue: 100,
 })
 
-// To send the message simply
+// To send the message simply pack the message into a byte buffer for sending!
 responseBuffer := packet.Pack()
 ```
 
