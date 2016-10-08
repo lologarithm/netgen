@@ -101,6 +101,13 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 			WriteGoLen(f, 1, gobuf, messageMap, enumMap)
 		}
 		gobuf.WriteString("\treturn mylen\n}\n\n")
+
+		gobuf.WriteString("func (m ")
+		gobuf.WriteString(msg.Name)
+		gobuf.WriteString(") MsgType() MessageType {\n\treturn ")
+		gobuf.WriteString(msg.Name)
+		gobuf.WriteString("MsgType\n}\n\n")
+
 	}
 	os.MkdirAll(pkgname, 0777)
 	ioutil.WriteFile(path.Join(pkgname, pkgname+".go"), gobuf.Bytes(), 0666)

@@ -1,14 +1,15 @@
 type Net interface {
 	Serialize([]byte)
 	Len() int
+	MsgType() MessageType
 }
 
 const FrameLen int = 6
 
-func NewPacket(t MessageType, msg Net) *Packet {
+func NewPacket(msg Net) *Packet {
 	return &Packet{
 		Frame: Frame{
-			MsgType:       t,
+			MsgType:       msg.MsgType(),
 			ContentLength: uint16(msg.Len()),
 		},
 		NetMsg: msg,
