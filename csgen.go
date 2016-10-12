@@ -68,7 +68,7 @@ func WriteCS(messages []Message, messageMap map[string]Message) {
 		gobuf.WriteString("\t}\n}\n\n")
 
 	}
-	ioutil.WriteFile("../slinkclient/Assets/Scripts/messages/messages.cs", gobuf.Bytes(), 0775)
+	ioutil.WriteFile("netgen.cs", gobuf.Bytes(), 0775)
 }
 
 func goTypeToCS(tn string) string {
