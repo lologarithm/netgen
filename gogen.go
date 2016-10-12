@@ -17,7 +17,7 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 		fmt.Printf("Error: %s\n", err)
 		panic("failed to load frame helper.")
 	}
-	gobuf.WriteString(fmt.Sprintf("package %s\n\nimport (\n\t\"encoding/binary\"\n\t\"fmt\"\n\t\"math\"\n)\n\n", pkgname))
+	gobuf.WriteString(fmt.Sprintf("package %s\n\nimport (\n\t\"math\"\n)\n\n", pkgname))
 	gobuf.WriteString("// Make sure math import is always valid\nvar _ = math.Pi\n\n")
 	gobuf.Write(f)
 	gobuf.WriteString("\n")
@@ -42,7 +42,7 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 		gobuf.WriteString(t.Name)
 		gobuf.WriteString("Deserialize(content)\n\t\treturn &msg\n")
 	}
-	gobuf.WriteString("\tdefault:\n\t\tfmt.Printf(\"Unknown message type: %d\\n\", packet.Frame.MsgType)\n\t\treturn nil\n\t}\n}\n\n")
+	gobuf.WriteString("\tdefault:\n\t\treturn nil\n\t}\n}\n\n")
 
 	for _, enum := range enums {
 		gobuf.WriteString("type ")
@@ -175,7 +175,7 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 }
 
 func writeArrayLen(f MessageField, scopeDepth int, buf *bytes.Buffer) {
-	buf.WriteString("binary.LittleEndian.PutUint32(buffer[idx:], uint32(len(")
+	buf.WriteString("LittleEndian.PutUint32(buffer[idx:], uint32(len(")
 	if scopeDepth == 1 {
 		buf.WriteString("m.")
 	}
@@ -239,7 +239,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString(f.Name)
 		writeIdxInc(f, scopeDepth, buf)
 	case "int16", "uint16":
-		buf.WriteString("binary.LittleEndian.PutUint16(buffer[idx:], uint16(")
+		buf.WriteString("LittleEndian.PutUint16(buffer[idx:], uint16(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
@@ -247,7 +247,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
 	case "int32", "uint32":
-		buf.WriteString("binary.LittleEndian.PutUint32(buffer[idx:], uint32(")
+		buf.WriteString("LittleEndian.PutUint32(buffer[idx:], uint32(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
@@ -255,7 +255,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
 	case "int64", "uint64":
-		buf.WriteString("binary.LittleEndian.PutUint64(buffer[idx:], uint64(")
+		buf.WriteString("LittleEndian.PutUint64(buffer[idx:], uint64(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
@@ -263,7 +263,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
 	case "float64":
-		buf.WriteString("binary.LittleEndian.PutUint64(buffer[idx:], math.Float64bits(")
+		buf.WriteString("LittleEndian.PutUint64(buffer[idx:], math.Float64bits(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
@@ -314,7 +314,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 			buf.WriteString(f.Name)
 			buf.WriteString(".Len()\n")
 		} else if _, ok := enums[f.Type]; ok {
-			buf.WriteString("binary.LittleEndian.PutUint32(buffer[idx:], uint32(")
+			buf.WriteString("LittleEndian.PutUint32(buffer[idx:], uint32(")
 			if scopeDepth == 1 {
 				buf.WriteString("m.")
 			}
@@ -330,7 +330,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 }
 
 func writeNumericDeserialFunc(f MessageField, scopeDepth int, buf *bytes.Buffer) {
-	buf.WriteString("binary.LittleEndian.")
+	buf.WriteString("LittleEndian.")
 	switch f.Type {
 	case "int16", "uint16":
 		buf.WriteString("Uint16(")
@@ -345,7 +345,7 @@ func writeNumericDeserialFunc(f MessageField, scopeDepth int, buf *bytes.Buffer)
 
 func writeArrayLenRead(lname string, scopeDepth int, buf *bytes.Buffer) {
 	buf.WriteString(lname)
-	buf.WriteString(" := int(binary.LittleEndian.Uint32(buffer[idx:]))\n")
+	buf.WriteString(" := int(LittleEndian.Uint32(buffer[idx:]))\n")
 	for i := 0; i < scopeDepth; i++ {
 		buf.WriteString("\t")
 	}
@@ -478,7 +478,7 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 			buf.WriteString(" = ")
 			buf.WriteString(f.Type)
 			buf.WriteString("(")
-			buf.WriteString("binary.LittleEndian.")
+			buf.WriteString("LittleEndian.")
 			buf.WriteString("Uint32(")
 			buf.WriteString("buffer[idx:]")
 			buf.WriteString("))")

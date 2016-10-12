@@ -101,8 +101,9 @@ func main() {
 
 	// 3. Generate c# classes
 	// TODO: C# doesn't support enums yet
-	WriteCS(messages, messageMap)
+	// WriteCS(messages, messageMap)
 
+	WriteDartBindings(pkgName, messages, messageMap, enums, enumMap)
 }
 
 // Message is a message that can be serialized across network.
