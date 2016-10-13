@@ -7,17 +7,27 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 )
 
-func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) {
+func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum, generatejs int) {
 	gobuf := &bytes.Buffer{}
+	if generatejs == 2 {
+		gobuf.WriteString("// +build !js\n\n")
+	} else if generatejs == 1 {
+		gobuf.WriteString("// +build js\n\n")
+	}
 	gopath := os.Getenv("GOPATH")
 	f, err := ioutil.ReadFile(path.Join(gopath, "src/github.com/lologarithm/netgen/lib/go/frame.go.tmpl"))
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		panic("failed to load frame helper.")
 	}
-	gobuf.WriteString(fmt.Sprintf("package %s\n\nimport (\n\t\"math\"\n)\n\n", pkgname))
+	extraImports := ""
+	if generatejs == 1 {
+		extraImports = "\t\"github.com/gopherjs/gopherjs/js\"\n"
+	}
+	gobuf.WriteString(fmt.Sprintf("package %s\n\nimport (\n\t\"math\"\n%s)\n\n", pkgname, extraImports))
 	gobuf.WriteString("// Make sure math import is always valid\nvar _ = math.Pi\n\n")
 	gobuf.Write(f)
 	gobuf.WriteString("\n")
@@ -49,12 +59,7 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 		gobuf.WriteString(enum.Name)
 		gobuf.WriteString(" int\n\nconst(")
 		for _, ev := range enum.Values {
-			gobuf.WriteString("\n\t")
-			gobuf.WriteString(ev.Name)
-			gobuf.WriteString("\t ")
-			gobuf.WriteString(enum.Name)
-			gobuf.WriteString(" = ")
-			gobuf.WriteString(strconv.Itoa(ev.Value))
+			gobuf.WriteString(fmt.Sprintf("\n\t%s\t %s = %d", ev.Name, enum.Name, ev.Value))
 		}
 		gobuf.WriteString("\n)\n\n")
 	}
@@ -63,40 +68,45 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 	for _, msg := range messages {
 		gobuf.WriteString("type ")
 		gobuf.WriteString(msg.Name)
-		gobuf.WriteString(" struct {")
+		gobuf.WriteString(" struct {\n")
+		if generatejs == 1 {
+			gobuf.WriteString("\t*js.Object\n")
+		}
 		for _, f := range msg.Fields {
 			gobuf.WriteString("\n\t")
 			gobuf.WriteString(f.Name)
 			gobuf.WriteString(" ")
+			if f.Array {
+				gobuf.WriteString("[]")
+			}
 			if f.Pointer {
 				gobuf.WriteString("*")
 			}
 			gobuf.WriteString(f.Type)
+			if generatejs == 1 {
+				gobuf.WriteString(fmt.Sprintf("\t `js:\"%s\"`", f.Name))
+			}
 		}
-		gobuf.WriteString("\n}\n\n")
-		gobuf.WriteString("func (m ")
-		gobuf.WriteString(msg.Name)
-		gobuf.WriteString(") Serialize(buffer []byte) {\n\tidx := 0\n")
+		gobuf.WriteString(fmt.Sprintf("\n}\n\nfunc (m %s) Serialize(buffer []byte) {\n", msg.Name))
+		if len(msg.Fields) > 0 {
+			gobuf.WriteString("\tidx := 0\n")
+		}
 		for _, f := range msg.Fields {
 			WriteGoSerialize(f, 1, gobuf, messageMap, enumMap)
 		}
-		// cause im lazy
-		gobuf.WriteString("\n\t_ = idx\n}\n\n")
-
-		gobuf.WriteString("func ")
-		gobuf.WriteString(msg.Name)
-		gobuf.WriteString("Deserialize(buffer []byte) (m ")
-		gobuf.WriteString(msg.Name)
-		gobuf.WriteString(") {\n\tidx := 0\n")
+		gobuf.WriteString("}\n")
+		gobuf.WriteString(fmt.Sprintf("\nfunc %sDeserialize(buffer []byte) (m %s) {\n", msg.Name, msg.Name))
+		if generatejs == 1 {
+			gobuf.WriteString(fmt.Sprintf("\tm = %s{Object: js.Global.Get(\"Object\").New(), }\n", msg.Name))
+		}
+		if len(msg.Fields) > 0 {
+			gobuf.WriteString("\tidx := 0\n")
+		}
 		for _, f := range msg.Fields {
 			WriteGoDeserial(f, 1, gobuf, messageMap, enumMap)
 		}
-		// cause im lazy.
-		gobuf.WriteString("\n\t_ = idx\n\treturn m\n}\n\n")
-
-		gobuf.WriteString("func (m ")
-		gobuf.WriteString(msg.Name)
-		gobuf.WriteString(") Len() int {\n\tmylen := 0\n")
+		gobuf.WriteString("\treturn m\n}\n")
+		gobuf.WriteString(fmt.Sprintf("\nfunc (m %s) Len() int {\n\tmylen := 0\n", msg.Name))
 		for _, f := range msg.Fields {
 			WriteGoLen(f, 1, gobuf, messageMap, enumMap)
 		}
@@ -109,6 +119,12 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 		gobuf.WriteString("MsgType\n}\n\n")
 
 	}
+	if generatejs == 1 {
+		os.MkdirAll(pkgname, 0777)
+		ioutil.WriteFile(path.Join(pkgname, pkgname+"js.go"), gobuf.Bytes(), 0666)
+		return
+	}
+	WriteGo(pkgname, messages, messageMap, enums, enumMap, 1)
 	os.MkdirAll(pkgname, 0777)
 	ioutil.WriteFile(path.Join(pkgname, pkgname+".go"), gobuf.Bytes(), 0666)
 }
@@ -118,15 +134,17 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 		buf.WriteString("\t")
 	}
 	switch f.Type {
-	case "[]byte":
-		buf.WriteString("mylen += 4 + len(")
-		if scopeDepth == 1 {
-			buf.WriteString("m.")
-		}
-		buf.WriteString(f.Name)
-		buf.WriteString(")")
 	case "byte":
-		buf.WriteString("mylen += 1")
+		if f.Array {
+			buf.WriteString("mylen += 4 + len(")
+			if scopeDepth == 1 {
+				buf.WriteString("m.")
+			}
+			buf.WriteString(f.Name)
+			buf.WriteString(")")
+		} else {
+			buf.WriteString("mylen += 1")
+		}
 	case "uint16", "int16":
 		buf.WriteString("mylen += 2")
 	case "uint32", "int32":
@@ -141,7 +159,7 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 		buf.WriteString(f.Name)
 		buf.WriteString(")")
 	default:
-		if f.Type[:2] == "[]" {
+		if f.Array {
 			buf.WriteString("mylen += 4\n\t")
 			fn := "v" + strconv.Itoa(scopeDepth+1)
 			buf.WriteString("for _, ")
@@ -155,7 +173,7 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 			buf.WriteString("\t_ = ")
 			buf.WriteString(fn)
 			buf.WriteString("\n")
-			WriteGoLen(MessageField{Name: fn, Type: f.Type[2:], Order: f.Order}, scopeDepth+1, buf, messages, enums)
+			WriteGoLen(MessageField{Name: fn, Type: f.Type, Order: f.Order, Pointer: f.Pointer}, scopeDepth+1, buf, messages, enums)
 			for i := 0; i < scopeDepth; i++ {
 				buf.WriteString("\t")
 			}
@@ -222,22 +240,26 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString("\t")
 	}
 	switch f.Type {
-	case "[]byte":
-		writeArrayLen(f, scopeDepth, buf)
-		buf.WriteString("copy(buffer[idx:], ")
-		if scopeDepth == 1 {
-			buf.WriteString("m.")
-		}
-		buf.WriteString(f.Name)
-		buf.WriteString(")")
-		writeIdxInc(f, scopeDepth, buf)
 	case "byte":
-		buf.WriteString("buffer[idx] = ")
-		if scopeDepth == 1 {
-			buf.WriteString("m.")
+		if f.Array {
+			// Faster handler for byte arrays
+			writeArrayLen(f, scopeDepth, buf)
+			buf.WriteString("copy(buffer[idx:], ")
+			if scopeDepth == 1 {
+				buf.WriteString("m.")
+			}
+			buf.WriteString(f.Name)
+			buf.WriteString(")")
+			writeIdxInc(f, scopeDepth, buf)
+		} else {
+			// Single byte
+			buf.WriteString("buffer[idx] = ")
+			if scopeDepth == 1 {
+				buf.WriteString("m.")
+			}
+			buf.WriteString(f.Name)
+			writeIdxInc(f, scopeDepth, buf)
 		}
-		buf.WriteString(f.Name)
-		writeIdxInc(f, scopeDepth, buf)
 	case "int16", "uint16":
 		buf.WriteString("LittleEndian.PutUint16(buffer[idx:], uint16(")
 		if scopeDepth == 1 {
@@ -280,7 +302,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
 	default:
-		if f.Type[:2] == "[]" {
+		if f.Array {
 			// Array!
 			writeArrayLen(f, scopeDepth, buf)
 			fn := "v" + strconv.Itoa(scopeDepth+1)
@@ -292,7 +314,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 			}
 			buf.WriteString(f.Name)
 			buf.WriteString(" {\n")
-			WriteGoSerialize(MessageField{Name: fn, Type: f.Type[2:], Order: f.Order}, scopeDepth+1, buf, messages, enums)
+			WriteGoSerialize(MessageField{Name: fn, Type: f.Type, Order: f.Order, Pointer: f.Pointer}, scopeDepth+1, buf, messages, enums)
 			for i := 0; i < scopeDepth; i++ {
 				buf.WriteString("\t")
 			}
@@ -374,12 +396,9 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 		buf.WriteString(f.Name)
 		buf.WriteString(" = ")
 		switch f.Type {
-		case "int16":
-			buf.WriteString("int16(")
-		case "int32":
-			buf.WriteString("int32(")
-		case "int64":
-			buf.WriteString("int64(")
+		case "int16", "int32", "int64":
+			buf.WriteString(f.Type)
+			buf.WriteString("(")
 		case "float64":
 			buf.WriteString("math.Float64frombits(")
 		}
@@ -401,7 +420,7 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 		buf.WriteString("])")
 		writeIdxInc(f, scopeDepth, buf)
 	default:
-		if f.Type[:2] == "[]" {
+		if f.Array {
 			// Get len of array
 			lname := "l" + strconv.Itoa(f.Order) + "_" + strconv.Itoa(scopeDepth)
 			writeArrayLenRead(lname, scopeDepth, buf)
@@ -412,7 +431,10 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 			}
 			buf.WriteString(f.Name)
 			buf.WriteString(" = make([]")
-			buf.WriteString(f.Type[2:])
+			if f.Pointer {
+				buf.WriteString("*")
+			}
+			buf.WriteString(f.Type)
 			buf.WriteString(", ")
 			buf.WriteString(lname)
 			buf.WriteString(")\n")
@@ -429,7 +451,7 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 				fn += "m."
 			}
 			fn += f.Name + "[i]"
-			WriteGoDeserial(MessageField{Name: fn, Type: f.Type[2:]}, scopeDepth+1, buf, messages, enums)
+			WriteGoDeserial(MessageField{Name: fn, Type: f.Type, Pointer: f.Pointer}, scopeDepth+1, buf, messages, enums)
 			for i := 0; i < scopeDepth; i++ {
 				buf.WriteString("\t")
 			}
@@ -437,8 +459,12 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 		} else if _, ok := messages[f.Type]; ok {
 			// 	// Custom message deserial here.
 			if f.Pointer {
-				buf.WriteString("var sub")
-				buf.WriteString(f.Name)
+				subName := "sub" + f.Name
+				if strings.Contains(f.Name, "[") {
+					subName = "subi"
+				}
+				buf.WriteString("var ")
+				buf.WriteString(subName)
 				buf.WriteString(" = ")
 				buf.WriteString(f.Type)
 				buf.WriteString("Deserialize(buffer[idx:])\n")
@@ -449,8 +475,8 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 					buf.WriteString("m.")
 				}
 				buf.WriteString(f.Name)
-				buf.WriteString(" = &sub")
-				buf.WriteString(f.Name)
+				buf.WriteString(" = &")
+				buf.WriteString(subName)
 				buf.WriteString("\n")
 			} else {
 				if scopeDepth == 1 {
