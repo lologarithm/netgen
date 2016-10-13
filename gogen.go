@@ -10,24 +10,15 @@ import (
 	"strings"
 )
 
-func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum, generatejs int) {
+func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) {
 	gobuf := &bytes.Buffer{}
-	if generatejs == 2 {
-		gobuf.WriteString("// +build !js\n\n")
-	} else if generatejs == 1 {
-		gobuf.WriteString("// +build js\n\n")
-	}
 	gopath := os.Getenv("GOPATH")
 	f, err := ioutil.ReadFile(path.Join(gopath, "src/github.com/lologarithm/netgen/lib/go/frame.go.tmpl"))
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		panic("failed to load frame helper.")
 	}
-	extraImports := ""
-	if generatejs == 1 {
-		extraImports = "\t\"github.com/gopherjs/gopherjs/js\"\n"
-	}
-	gobuf.WriteString(fmt.Sprintf("package %s\n\nimport (\n\t\"math\"\n%s)\n\n", pkgname, extraImports))
+	gobuf.WriteString(fmt.Sprintf("package %s\n\nimport (\n\t\"math\"\n)\n\n", pkgname))
 	gobuf.WriteString("// Make sure math import is always valid\nvar _ = math.Pi\n\n")
 	gobuf.Write(f)
 	gobuf.WriteString("\n")
@@ -68,10 +59,7 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 	for _, msg := range messages {
 		gobuf.WriteString("type ")
 		gobuf.WriteString(msg.Name)
-		gobuf.WriteString(" struct {\n")
-		if generatejs == 1 {
-			gobuf.WriteString("\t*js.Object\n")
-		}
+		gobuf.WriteString(" struct {")
 		for _, f := range msg.Fields {
 			gobuf.WriteString("\n\t")
 			gobuf.WriteString(f.Name)
@@ -83,9 +71,6 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 				gobuf.WriteString("*")
 			}
 			gobuf.WriteString(f.Type)
-			if generatejs == 1 {
-				gobuf.WriteString(fmt.Sprintf("\t `js:\"%s\"`", f.Name))
-			}
 		}
 		gobuf.WriteString(fmt.Sprintf("\n}\n\nfunc (m %s) Serialize(buffer []byte) {\n", msg.Name))
 		if len(msg.Fields) > 0 {
@@ -96,9 +81,6 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 		}
 		gobuf.WriteString("}\n")
 		gobuf.WriteString(fmt.Sprintf("\nfunc %sDeserialize(buffer []byte) (m %s) {\n", msg.Name, msg.Name))
-		if generatejs == 1 {
-			gobuf.WriteString(fmt.Sprintf("\tm = %s{Object: js.Global.Get(\"Object\").New(), }\n", msg.Name))
-		}
 		if len(msg.Fields) > 0 {
 			gobuf.WriteString("\tidx := 0\n")
 		}
@@ -119,12 +101,6 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 		gobuf.WriteString("MsgType\n}\n\n")
 
 	}
-	if generatejs == 1 {
-		os.MkdirAll(pkgname, 0777)
-		ioutil.WriteFile(path.Join(pkgname, pkgname+"js.go"), gobuf.Bytes(), 0666)
-		return
-	}
-	WriteGo(pkgname, messages, messageMap, enums, enumMap, 1)
 	os.MkdirAll(pkgname, 0777)
 	ioutil.WriteFile(path.Join(pkgname, pkgname+".go"), gobuf.Bytes(), 0666)
 }
