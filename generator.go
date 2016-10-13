@@ -104,18 +104,15 @@ func main() {
 			}
 		}
 	}
-	jsgen := 0
-	if *gendart {
-		jsgen = 2
-	}
 	// 2. Write Go classes
-	WriteGo(pkgName, messages, messageMap, enums, enumMap, jsgen)
+	WriteGo(pkgName, messages, messageMap, enums, enumMap)
 
 	// 3. Generate c# classes
 	// TODO: C# doesn't support enums yet
 	// WriteCS(messages, messageMap)
 	if *gendart {
 		WriteDartBindings(pkgName, messages, messageMap, enums, enumMap)
+		WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
 	}
 }
 
