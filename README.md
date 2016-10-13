@@ -1,8 +1,11 @@
 netgen
 --------------------
 
-netgen is a simple go serialization library (with the start of C# support)
+netgen is a simple go serialization library (with the start of C# support).
+Optionally you can generate a copy of the go serializer designed to be run through gopherjs and automatically generate the dart object definitions to create js bindings with the converted code.
 
+Usage
+-------------------
 You first create a netgen definition file (example in here 'defs.ng')
 
 Example
