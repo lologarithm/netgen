@@ -16,7 +16,7 @@ import (
 
 func WriteDartBindings(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) {
 	gobuf := &bytes.Buffer{}
-	gobuf.WriteString(fmt.Sprintf("@JS('%s')\nlibrary %s;\n\nimport \"package:js/js.dart\";\n\n", pkgname, pkgname))
+	gobuf.WriteString(fmt.Sprintf("part of %s;\n", pkgname))
 
 	for _, en := range enums {
 		gobuf.WriteString("class ")
