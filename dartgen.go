@@ -29,14 +29,14 @@ func WriteDartBindings(pkgname string, messages []Message, messageMap map[string
 	}
 
 	for _, m := range messages {
-		gobuf.WriteString("@JS()\nclass ")
+		gobuf.WriteString("@JS()\n@anonymous\nclass ")
 		gobuf.WriteString(m.Name)
 		gobuf.WriteString(" {\n")
 		gobuf.WriteString("external factory ")
 		gobuf.WriteString(m.Name)
 		gobuf.WriteString("({")
 		for i, f := range m.Fields {
-			gobuf.WriteString(fmt.Sprintf("%s %s", dartType(f.Type, enumMap), f.Name))
+			gobuf.WriteString(fmt.Sprintf("%s %s", dartType(f, enumMap), f.Name))
 			if i != len(m.Fields)-1 {
 				gobuf.WriteString(",")
 			}
@@ -44,7 +44,7 @@ func WriteDartBindings(pkgname string, messages []Message, messageMap map[string
 		gobuf.WriteString("});\n")
 
 		for _, f := range m.Fields {
-			dartT := dartType(f.Type, enumMap)
+			dartT := dartType(f, enumMap)
 			gobuf.WriteString(fmt.Sprintf("\nexternal %s get %s;\n", dartT, f.Name))
 			gobuf.WriteString(fmt.Sprintf("external void set %s(%s val);\n", f.Name, dartT))
 		}
@@ -54,19 +54,19 @@ func WriteDartBindings(pkgname string, messages []Message, messageMap map[string
 	ioutil.WriteFile(path.Join(pkgname, pkgname+".dart"), gobuf.Bytes(), 0666)
 }
 
-func dartType(t string, enums map[string]Enum) string {
-	if t[0] == '[' {
-		return "List<" + dartType(t[2:], enums) + ">"
+func dartType(f MessageField, enums map[string]Enum) string {
+	if f.Array {
+		return "List<" + dartType(MessageField{Type: f.Type}, enums) + ">"
 	}
-	switch t {
+	switch f.Type {
 	case "int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64":
 		return "int"
 	case "string":
 		return "String"
 	default:
-		if _, ok := enums[t]; ok {
+		if _, ok := enums[f.Type]; ok {
 			return "int"
 		}
-		return t
+		return f.Type
 	}
 }

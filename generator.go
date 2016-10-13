@@ -1,15 +1,20 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 )
 
+var gendart = flag.Bool("gendart", false, "Should generate gopherjs copy and dart bindings")
+var input = flag.String("input", "", "Input defition file to generate from")
+
 func main() {
+	flag.Parse()
+
 	messages := []Message{}
 	enums := []Enum{}
 	messageMap := map[string]Message{}
@@ -17,8 +22,8 @@ func main() {
 
 	// 1. Read defs.ng
 	inputFile := "defs.ng"
-	if len(os.Args) > 1 && os.Args[1] != "" {
-		inputFile = os.Args[1]
+	if *input != "" {
+		inputFile = *input
 	}
 	data, err := ioutil.ReadFile(inputFile)
 	if err != nil {
@@ -62,6 +67,10 @@ func main() {
 					Type:  parts[1],
 					Order: len(message.Fields),
 				}
+				if field.Type[0] == '[' {
+					field.Array = true
+					field.Type = field.Type[2:]
+				}
 				if field.Type[0] == '*' {
 					field.Type = field.Type[1:]
 					field.Pointer = true
@@ -95,15 +104,19 @@ func main() {
 			}
 		}
 	}
-
+	jsgen := 0
+	if *gendart {
+		jsgen = 2
+	}
 	// 2. Write Go classes
-	WriteGo(pkgName, messages, messageMap, enums, enumMap)
+	WriteGo(pkgName, messages, messageMap, enums, enumMap, jsgen)
 
 	// 3. Generate c# classes
 	// TODO: C# doesn't support enums yet
 	// WriteCS(messages, messageMap)
-
-	WriteDartBindings(pkgName, messages, messageMap, enums, enumMap)
+	if *gendart {
+		WriteDartBindings(pkgName, messages, messageMap, enums, enumMap)
+	}
 }
 
 // Message is a message that can be serialized across network.
@@ -127,6 +140,7 @@ type EnumValue struct {
 type MessageField struct {
 	Name    string
 	Type    string
+	Array   bool
 	Pointer bool
 	Order   int
 	Size    int
