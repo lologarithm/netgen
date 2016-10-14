@@ -12,18 +12,11 @@ import (
 
 func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) {
 	gobuf := &bytes.Buffer{}
-	gopath := os.Getenv("GOPATH")
-	f, err := ioutil.ReadFile(path.Join(gopath, "src/github.com/lologarithm/netgen/lib/go/frame.go.tmpl"))
-	if err != nil {
-		fmt.Printf("Error: %s\n", err)
-		panic("failed to load frame helper.")
-	}
-	gobuf.WriteString(fmt.Sprintf("package %s\n\nimport (\n\t\"math\"\n)\n\n", pkgname))
+	gobuf.WriteString(fmt.Sprintf("package %s\n\nimport (\n\t\"math\"\n\t\"github.com/lologarithm/netgen/lib/netgengo\"\n)\n\n", pkgname))
 	gobuf.WriteString("// Make sure math import is always valid\nvar _ = math.Pi\n\n")
-	gobuf.Write(f)
 	gobuf.WriteString("\n")
 	// 1. List type values!
-	gobuf.WriteString("const (\n\tUnknownMsgType MessageType = iota\n\tAckMsgType\n")
+	gobuf.WriteString("const (\n\tUnknownMsgType netgengo.MessageType = iota\n\tAckMsgType\n")
 	for _, t := range messages {
 		gobuf.WriteString("\t")
 		gobuf.WriteString(t.Name)
@@ -31,9 +24,11 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 	}
 	gobuf.WriteString(")\n\n")
 
+	gobuf.WriteString("func NextPacket(buffer []byte) (packet netgengo.Packet, ok bool) { return netgengo.NextPacket(buffer, ParseNetMessage) }\n\n")
+
 	// 1.a. Parent parser function
 	gobuf.WriteString("// ParseNetMessage accepts input of raw bytes from a NetMessage. Parses and returns a Net message.\n")
-	gobuf.WriteString("func ParseNetMessage(packet Packet, content []byte) Net {\n")
+	gobuf.WriteString("func ParseNetMessage(packet netgengo.Packet, content []byte) netgengo.Net {\n")
 	gobuf.WriteString("\tswitch packet.Frame.MsgType {\n")
 	for _, t := range messages {
 		gobuf.WriteString("\tcase ")
@@ -96,7 +91,7 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 
 		gobuf.WriteString("func (m ")
 		gobuf.WriteString(msg.Name)
-		gobuf.WriteString(") MsgType() MessageType {\n\treturn ")
+		gobuf.WriteString(") MsgType() netgengo.MessageType {\n\treturn ")
 		gobuf.WriteString(msg.Name)
 		gobuf.WriteString("MsgType\n}\n\n")
 
@@ -169,7 +164,7 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 }
 
 func writeArrayLen(f MessageField, scopeDepth int, buf *bytes.Buffer) {
-	buf.WriteString("LittleEndian.PutUint32(buffer[idx:], uint32(len(")
+	buf.WriteString("netgengo.LittleEndian.PutUint32(buffer[idx:], uint32(len(")
 	if scopeDepth == 1 {
 		buf.WriteString("m.")
 	}
@@ -237,7 +232,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 			writeIdxInc(f, scopeDepth, buf)
 		}
 	case "int16", "uint16":
-		buf.WriteString("LittleEndian.PutUint16(buffer[idx:], uint16(")
+		buf.WriteString("netgengo.LittleEndian.PutUint16(buffer[idx:], uint16(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
@@ -245,7 +240,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
 	case "int32", "uint32":
-		buf.WriteString("LittleEndian.PutUint32(buffer[idx:], uint32(")
+		buf.WriteString("netgengo.LittleEndian.PutUint32(buffer[idx:], uint32(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
@@ -253,7 +248,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
 	case "int64", "uint64":
-		buf.WriteString("LittleEndian.PutUint64(buffer[idx:], uint64(")
+		buf.WriteString("netgengo.LittleEndian.PutUint64(buffer[idx:], uint64(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
@@ -261,7 +256,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
 	case "float64":
-		buf.WriteString("LittleEndian.PutUint64(buffer[idx:], math.Float64bits(")
+		buf.WriteString("netgengo.LittleEndian.PutUint64(buffer[idx:], math.Float64bits(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
@@ -312,7 +307,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 			buf.WriteString(f.Name)
 			buf.WriteString(".Len()\n")
 		} else if _, ok := enums[f.Type]; ok {
-			buf.WriteString("LittleEndian.PutUint32(buffer[idx:], uint32(")
+			buf.WriteString("netgengo.LittleEndian.PutUint32(buffer[idx:], uint32(")
 			if scopeDepth == 1 {
 				buf.WriteString("m.")
 			}
@@ -328,7 +323,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 }
 
 func writeNumericDeserialFunc(f MessageField, scopeDepth int, buf *bytes.Buffer) {
-	buf.WriteString("LittleEndian.")
+	buf.WriteString("netgengo.LittleEndian.")
 	switch f.Type {
 	case "int16", "uint16":
 		buf.WriteString("Uint16(")
@@ -343,7 +338,7 @@ func writeNumericDeserialFunc(f MessageField, scopeDepth int, buf *bytes.Buffer)
 
 func writeArrayLenRead(lname string, scopeDepth int, buf *bytes.Buffer) {
 	buf.WriteString(lname)
-	buf.WriteString(" := int(LittleEndian.Uint32(buffer[idx:]))\n")
+	buf.WriteString(" := int(netgengo.LittleEndian.Uint32(buffer[idx:]))\n")
 	for i := 0; i < scopeDepth; i++ {
 		buf.WriteString("\t")
 	}
@@ -480,7 +475,7 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 			buf.WriteString(" = ")
 			buf.WriteString(f.Type)
 			buf.WriteString("(")
-			buf.WriteString("LittleEndian.")
+			buf.WriteString("netgengo.LittleEndian.")
 			buf.WriteString("Uint32(")
 			buf.WriteString("buffer[idx:]")
 			buf.WriteString("))")
