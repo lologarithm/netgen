@@ -192,7 +192,16 @@ func writeIdxInc(f MessageField, scopeDepth int, buf *bytes.Buffer) {
 	buf.WriteString("idx+=")
 	switch f.Type {
 	case "byte":
-		buf.WriteString("1")
+		if f.Array {
+			buf.WriteString("len(")
+			if scopeDepth == 1 {
+				buf.WriteString("m.")
+			}
+			buf.WriteString(f.Name)
+			buf.WriteString(")")
+		} else {
+			buf.WriteString("1")
+		}
 	case "int16", "uint16":
 		buf.WriteString("2")
 	case "int32", "uint32":
@@ -201,12 +210,17 @@ func writeIdxInc(f MessageField, scopeDepth int, buf *bytes.Buffer) {
 		buf.WriteString("8")
 	default:
 		// Array probably
-		buf.WriteString("len(")
-		if scopeDepth == 1 {
-			buf.WriteString("m.")
+		if f.Type == "string" || f.Array {
+			buf.WriteString("len(")
+			if scopeDepth == 1 {
+				buf.WriteString("m.")
+			}
+			buf.WriteString(f.Name)
+			buf.WriteString(")")
+		} else {
+			fmt.Printf("Failed to find type for '%s' to write idx incrementer for.", f.Type)
+			panic("unknown type")
 		}
-		buf.WriteString(f.Name)
-		buf.WriteString(")")
 	}
 	buf.WriteString("\n")
 }
@@ -359,12 +373,31 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 	}
 	switch f.Type {
 	case "byte":
-		if scopeDepth == 1 {
-			buf.WriteString("m.")
+		if f.Array {
+			lname := "l" + strconv.Itoa(f.Order) + "_" + strconv.Itoa(scopeDepth)
+			writeArrayLenRead(lname, scopeDepth, buf)
+
+			dest := ""
+			if scopeDepth == 1 {
+				dest = "m."
+			}
+			dest += f.Name
+			buf.WriteString(dest)
+			buf.WriteString(" = make([]byte, ")
+			buf.WriteString(lname)
+			buf.WriteString(")\n")
+			for i := 0; i < scopeDepth; i++ {
+				buf.WriteString("\t")
+			}
+			buf.WriteString(fmt.Sprintf("copy(%s, buffer[idx:idx+%s])\n", dest, lname))
+		} else {
+			if scopeDepth == 1 {
+				buf.WriteString("m.")
+			}
+			buf.WriteString(f.Name)
+			buf.WriteString(" = buffer[idx]\n")
+			writeIdxInc(f, scopeDepth, buf)
 		}
-		buf.WriteString(f.Name)
-		buf.WriteString(" = buffer[idx]\n")
-		writeIdxInc(f, scopeDepth, buf)
 	case "int16", "int32", "int64", "uint16", "uint32", "uint64", "float64":
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
