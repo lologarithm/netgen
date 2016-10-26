@@ -82,7 +82,7 @@ func WriteJSConvertField(buf *bytes.Buffer, pkgname string, f MessageField, subi
 			buf.WriteString(strings.Repeat("\t", scopeDepth))
 			buf.WriteString(fmt.Sprintf("%s = &%s", setname, subName))
 		} else {
-			buf.WriteString(fmt.Sprintf("%s = %sFromJS(jso.%s)", setname, f.Name, getname))
+			buf.WriteString(fmt.Sprintf("%s = %sFromJS(jso.%s)", setname, f.Type, getname))
 		}
 	} else if _, ok := enumMap[f.Type]; ok {
 		buf.WriteString(fmt.Sprintf("%s = %s(jso.%s.Int64())", setname, pkgname+"."+f.Type, getname))
