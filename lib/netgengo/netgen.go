@@ -1,3 +1,5 @@
+package netgengo
+
 var LittleEndian littleEndian
 
 type littleEndian struct{}
@@ -98,7 +100,9 @@ func ParseFrame(rawBytes []byte) (mf Frame, ok bool) {
 	return mf, true
 }
 
-func NextPacket(rawBytes []byte) (packet Packet, ok bool) {
+type NetParser func(Packet, []byte) Net
+
+func NextPacket(rawBytes []byte, parser NetParser) (packet Packet, ok bool) {
 	packet.Frame, ok = ParseFrame(rawBytes)
 	if !ok {
 		return
@@ -106,7 +110,7 @@ func NextPacket(rawBytes []byte) (packet Packet, ok bool) {
 
 	ok = false
 	if packet.Len() <= len(rawBytes) {
-		packet.NetMsg = ParseNetMessage(packet, rawBytes[FrameLen:packet.Len()])
+		packet.NetMsg = parser(packet, rawBytes[FrameLen:packet.Len()])
 		if packet.NetMsg != nil {
 			ok = true
 		}
