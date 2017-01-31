@@ -196,11 +196,13 @@ func WriteCSDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 
 		funcName := "Read"
 		if f.Type[0] == 'u' {
-			funcName += strings.ToUpper(f.Type[0:2]) + f.Type[2:]
+			// TODO: this isn't how things are done anymore, fix it later
+			// funcName += strings.ToUpper(string(f.Type[0:2]) + f.Type[2:]
 		} else if f.Type[0] == 'f' {
 			funcName += "Double"
 		} else {
-			funcName += strings.ToUpper(f.Type[0:1]) + f.Type[1:]
+			// TODO: this isn't how things are done anymore, fix it!
+			// funcName += strings.ToUpper(f.Type[0:1]) + f.Type[1:]
 		}
 		buf.WriteString(" = buffer.")
 		buf.WriteString(funcName)
@@ -292,7 +294,7 @@ func WriteCSDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 			}
 			buf.WriteString(f.Name)
 			buf.WriteString(" = new ")
-			buf.WriteString(f.Type[1:])
+			buf.WriteString(f.Type)
 			buf.WriteString("();\n")
 
 			for i := 0; i < scopeDepth+1; i++ {

@@ -59,9 +59,9 @@ func dartType(f MessageField, enums map[string]Enum) string {
 		return "List<" + dartType(MessageField{Type: f.Type}, enums) + ">"
 	}
 	switch f.Type {
-	case "int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64":
+	case ByteType, Int16Type, Int32Type, Int64Type, Uint16Type, Uint32Type, Uint64Type:
 		return "int"
-	case "string":
+	case StringType:
 		return "String"
 	default:
 		if _, ok := enums[f.Type]; ok {
