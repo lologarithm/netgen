@@ -23,6 +23,21 @@ func WriteJSConverter(pkgname string, messages []Message, messageMap map[string]
 	}
 	rootpkg := path.Join(rel, pkgname)
 	buf.WriteString(fmt.Sprintf("package %s\n\nimport (\n\t\"github.com/gopherjs/gopherjs/js\"\n\t\"%s\"\n)\n\n", pkgname+"js", rootpkg))
+
+	// 1.a. Parent parser function
+	buf.WriteString("// ParseNetMessageJS accepts input of js.Object, parses it and returns a Net message.\n")
+	buf.WriteString(fmt.Sprintf("func ParseNetMessageJS(jso *js.Object, t %s.MessageType) %s.Net {\n", pkgname, pkgname))
+	buf.WriteString("\tswitch t {\n")
+	for _, t := range messages {
+		buf.WriteString(fmt.Sprintf("\tcase %s.", pkgname))
+		buf.WriteString(t.Name)
+		buf.WriteString("MsgType:\n")
+		buf.WriteString("\t\tmsg := ")
+		buf.WriteString(t.Name)
+		buf.WriteString("FromJS(jso)\n\t\treturn &msg\n")
+	}
+	buf.WriteString("\tdefault:\n\t\treturn nil\n\t}\n}\n\n")
+
 	for _, msg := range messages {
 		WriteJSConvertFunc(buf, pkgname, msg, messageMap, enumMap)
 	}
@@ -93,12 +108,15 @@ func WriteJSConvertField(buf *bytes.Buffer, pkgname string, f MessageField, subi
 
 		buf.WriteString(fmt.Sprintf("%s = ", f.Name))
 		switch f.Type {
-		case "int8", "int16", "int32", "int64":
+		case ByteType, Int16Type, Int32Type, Int64Type:
 			buf.WriteString(fmt.Sprintf("%s(jso.%s.Int64())", f.Type, getname))
-		case "uint8", "uint16", "uint32", "uint64":
+		case Uint16Type, Uint32Type, Uint64Type:
 			buf.WriteString(fmt.Sprintf("%s(jso.%s.Uint64())", f.Type, getname))
-		case "string":
+		case StringType:
 			buf.WriteString(fmt.Sprintf("jso.%s.String()", getname))
+		case DynamicType:
+			getnametype := fmt.Sprintf("Get(\"%sType\")", f.Name)
+			buf.WriteString(fmt.Sprintf("ParseNetMessageJS(jso.%s, %s.MessageType(jso.%s.Int()))", getname, pkgname, getnametype))
 		default:
 			panic("Unknown type: " + f.Type)
 		}

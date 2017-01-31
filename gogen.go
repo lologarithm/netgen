@@ -72,6 +72,10 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 			}
 			if f.Type == DynamicType {
 				gobuf.WriteString("Net")
+				gobuf.WriteString("\n\t")
+				gobuf.WriteString(f.Name)
+				gobuf.WriteString("Type ")
+				gobuf.WriteString("MessageType")
 			} else {
 				gobuf.WriteString(f.Type)
 			}
@@ -140,11 +144,6 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 		buf.WriteString(f.Name)
 		buf.WriteString(")")
 	case DynamicType:
-		buf.WriteString("mylen += 4")
-		buf.WriteString("\n")
-		for i := 0; i < scopeDepth; i++ {
-			buf.WriteString("\t")
-		}
 		buf.WriteString("mylen += ")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
@@ -309,7 +308,21 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
 	case DynamicType:
-
+		// Custom message deserial here.
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(f.Name)
+		buf.WriteString(".Serialize(buffer[idx:])\n")
+		for i := 0; i < scopeDepth; i++ {
+			buf.WriteString("\t")
+		}
+		buf.WriteString("idx+=")
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(f.Name)
+		buf.WriteString(".Len()\n")
 	default:
 		if f.Array {
 			// Array!
@@ -447,6 +460,39 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 		buf.WriteString(lname)
 		buf.WriteString("])")
 		writeIdxInc(f, scopeDepth, buf)
+	case DynamicType:
+		//ParseNetMessage
+		buf.WriteString("p := Packet{}\n")
+		for i := 0; i < scopeDepth; i++ {
+			buf.WriteString("\t")
+		}
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(f.Name)
+		buf.WriteString(" = ParseNetMessage(p, buffer[idx:])\n")
+		for i := 0; i < scopeDepth; i++ {
+			buf.WriteString("\t")
+		}
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(fmt.Sprintf("%sType = ", f.Name))
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(fmt.Sprintf("%s.MsgType()\n", f.Name))
+
+		for i := 0; i < scopeDepth; i++ {
+			buf.WriteString("\t")
+		}
+		buf.WriteString("idx+=")
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(f.Name)
+		buf.WriteString(".Len()\n")
+
 	default:
 		if f.Array {
 			// Get len of array
