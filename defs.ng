@@ -17,6 +17,10 @@ struct Nested {
   B *SubNest2
 }
 
+struct ExampleDyn {
+  DynField dynamic
+}
+
 struct SubNest {
  B int
 }

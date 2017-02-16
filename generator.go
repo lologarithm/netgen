@@ -40,9 +40,15 @@ func main() {
 		if len(parts) > 1 {
 			if parts[0] == "enum" {
 				enum.Name = parts[1]
+				if parts[1] == DynamicType {
+					panic("dynamic is not valid type name")
+				}
 				continue
 			} else if parts[0] == "struct" {
 				message.Name = parts[1]
+				if parts[1] == DynamicType {
+					panic("dynamic is not valid type name")
+				}
 				continue
 			} else if parts[0] == "package" {
 				pkgName = parts[1]
@@ -142,3 +148,16 @@ type MessageField struct {
 	Order   int
 	Size    int
 }
+
+const (
+	StringType  string = "string"
+	ByteType    string = "byte"
+	Int16Type   string = "int16"
+	Uint16Type  string = "uint16"
+	Int32Type   string = "int32"
+	Uint32Type  string = "uint32"
+	Int64Type   string = "int64"
+	Uint64Type  string = "uint64"
+	Float64Type string = "float64"
+	DynamicType string = "dynamic"
+)

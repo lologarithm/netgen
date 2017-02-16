@@ -70,7 +70,16 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 			if f.Pointer {
 				gobuf.WriteString("*")
 			}
-			gobuf.WriteString(f.Type)
+			if f.Type == DynamicType {
+				gobuf.WriteString("Net")
+				gobuf.WriteString("\n\t")
+				gobuf.WriteString(f.Name)
+				gobuf.WriteString("Type ")
+				gobuf.WriteString("MessageType")
+			} else {
+				gobuf.WriteString(f.Type)
+			}
+
 		}
 		gobuf.WriteString(fmt.Sprintf("\n}\n\nfunc (m %s) Serialize(buffer []byte) {\n", msg.Name))
 		if len(msg.Fields) > 0 {
@@ -110,7 +119,7 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 		buf.WriteString("\t")
 	}
 	switch f.Type {
-	case "byte":
+	case ByteType:
 		if f.Array {
 			buf.WriteString("mylen += 4 + len(")
 			if scopeDepth == 1 {
@@ -121,19 +130,26 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 		} else {
 			buf.WriteString("mylen += 1")
 		}
-	case "uint16", "int16":
+	case Uint16Type, Int16Type:
 		buf.WriteString("mylen += 2")
-	case "uint32", "int32":
+	case Uint32Type, Int32Type:
 		buf.WriteString("mylen += 4")
-	case "uint64", "int64", "float64":
+	case Uint64Type, Int64Type, Float64Type:
 		buf.WriteString("mylen += 8")
-	case "string":
+	case StringType:
 		buf.WriteString("mylen += 4 + len(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
 		buf.WriteString(f.Name)
 		buf.WriteString(")")
+	case DynamicType:
+		buf.WriteString("mylen += ")
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(f.Name)
+		buf.WriteString(".Len()")
 	default:
 		if f.Array {
 			buf.WriteString("mylen += 4\n\t")
@@ -191,7 +207,7 @@ func writeIdxInc(f MessageField, scopeDepth int, buf *bytes.Buffer) {
 	}
 	buf.WriteString("idx+=")
 	switch f.Type {
-	case "byte":
+	case ByteType:
 		if f.Array {
 			buf.WriteString("len(")
 			if scopeDepth == 1 {
@@ -202,15 +218,15 @@ func writeIdxInc(f MessageField, scopeDepth int, buf *bytes.Buffer) {
 		} else {
 			buf.WriteString("1")
 		}
-	case "int16", "uint16":
+	case Int16Type, Uint16Type:
 		buf.WriteString("2")
-	case "int32", "uint32":
+	case Int32Type, Uint32Type:
 		buf.WriteString("4")
-	case "int64", "uint64", "float64":
+	case Int64Type, Uint64Type, Float64Type:
 		buf.WriteString("8")
 	default:
 		// Array probably
-		if f.Type == "string" || f.Array {
+		if f.Type == StringType || f.Array {
 			buf.WriteString("len(")
 			if scopeDepth == 1 {
 				buf.WriteString("m.")
@@ -230,7 +246,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString("\t")
 	}
 	switch f.Type {
-	case "byte":
+	case ByteType:
 		if f.Array {
 			// Faster handler for byte arrays
 			writeArrayLen(f, scopeDepth, buf)
@@ -250,7 +266,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 			buf.WriteString(f.Name)
 			writeIdxInc(f, scopeDepth, buf)
 		}
-	case "int16", "uint16":
+	case Int16Type, Uint16Type:
 		buf.WriteString("LittleEndian.PutUint16(buffer[idx:], uint16(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
@@ -258,7 +274,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString(f.Name)
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
-	case "int32", "uint32":
+	case Int32Type, Uint32Type:
 		buf.WriteString("LittleEndian.PutUint32(buffer[idx:], uint32(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
@@ -266,7 +282,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString(f.Name)
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
-	case "int64", "uint64":
+	case Int64Type, Uint64Type:
 		buf.WriteString("LittleEndian.PutUint64(buffer[idx:], uint64(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
@@ -274,7 +290,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString(f.Name)
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
-	case "float64":
+	case Float64Type:
 		buf.WriteString("LittleEndian.PutUint64(buffer[idx:], math.Float64bits(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
@@ -282,7 +298,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString(f.Name)
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
-	case "string":
+	case StringType:
 		writeArrayLen(f, scopeDepth, buf)
 		buf.WriteString("copy(buffer[idx:], []byte(")
 		if scopeDepth == 1 {
@@ -291,6 +307,22 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString(f.Name)
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
+	case DynamicType:
+		// Custom message deserial here.
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(f.Name)
+		buf.WriteString(".Serialize(buffer[idx:])\n")
+		for i := 0; i < scopeDepth; i++ {
+			buf.WriteString("\t")
+		}
+		buf.WriteString("idx+=")
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(f.Name)
+		buf.WriteString(".Len()\n")
 	default:
 		if f.Array {
 			// Array!
@@ -344,11 +376,11 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 func writeNumericDeserialFunc(f MessageField, scopeDepth int, buf *bytes.Buffer) {
 	buf.WriteString("LittleEndian.")
 	switch f.Type {
-	case "int16", "uint16":
+	case Int16Type, Uint16Type:
 		buf.WriteString("Uint16(")
-	case "int32", "uint32":
+	case Int32Type, Uint32Type:
 		buf.WriteString("Uint32(")
-	case "int64", "uint64", "float64":
+	case Int64Type, Uint64Type, Float64Type:
 		buf.WriteString("Uint64(")
 	}
 	buf.WriteString("buffer[idx:]")
@@ -372,7 +404,7 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 		buf.WriteString("\t")
 	}
 	switch f.Type {
-	case "byte":
+	case ByteType:
 		if f.Array {
 			lname := "l" + strconv.Itoa(f.Order) + "_" + strconv.Itoa(scopeDepth)
 			writeArrayLenRead(lname, scopeDepth, buf)
@@ -398,17 +430,17 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 			buf.WriteString(" = buffer[idx]\n")
 			writeIdxInc(f, scopeDepth, buf)
 		}
-	case "int16", "int32", "int64", "uint16", "uint32", "uint64", "float64":
+	case Int16Type, Int32Type, Int64Type, Uint16Type, Uint32Type, Uint64Type, Float64Type:
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
 		buf.WriteString(f.Name)
 		buf.WriteString(" = ")
 		switch f.Type {
-		case "int16", "int32", "int64":
+		case Int16Type, Int32Type, Int64Type:
 			buf.WriteString(f.Type)
 			buf.WriteString("(")
-		case "float64":
+		case Float64Type:
 			buf.WriteString("math.Float64frombits(")
 		}
 		writeNumericDeserialFunc(f, scopeDepth, buf)
@@ -416,7 +448,7 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 			buf.WriteString(")")
 		}
 		writeIdxInc(f, scopeDepth, buf)
-	case "string":
+	case StringType:
 		// Get length of string first
 		lname := "l" + strconv.Itoa(f.Order) + "_" + strconv.Itoa(scopeDepth)
 		writeArrayLenRead(lname, scopeDepth, buf)
@@ -428,6 +460,39 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 		buf.WriteString(lname)
 		buf.WriteString("])")
 		writeIdxInc(f, scopeDepth, buf)
+	case DynamicType:
+		//ParseNetMessage
+		buf.WriteString("p := Packet{}\n")
+		for i := 0; i < scopeDepth; i++ {
+			buf.WriteString("\t")
+		}
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(f.Name)
+		buf.WriteString(" = ParseNetMessage(p, buffer[idx:])\n")
+		for i := 0; i < scopeDepth; i++ {
+			buf.WriteString("\t")
+		}
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(fmt.Sprintf("%sType = ", f.Name))
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(fmt.Sprintf("%s.MsgType()\n", f.Name))
+
+		for i := 0; i < scopeDepth; i++ {
+			buf.WriteString("\t")
+		}
+		buf.WriteString("idx+=")
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(f.Name)
+		buf.WriteString(".Len()\n")
+
 	default:
 		if f.Array {
 			// Get len of array
