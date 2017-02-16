@@ -22,7 +22,7 @@ struct ExampleDyn {
 }
 
 struct SubNest {
- B int
+ B int32
 }
 
 struct SubNest2 {
