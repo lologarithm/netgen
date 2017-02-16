@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-var gendart = flag.Bool("gendart", false, "Should generate gopherjs copy and dart bindings")
+var genlist = flag.String("gen", "go", "list of languages to generate bindings for, separated by commas")
 var input = flag.String("input", "", "Input defition file to generate from")
 
 func main() {
@@ -110,15 +110,18 @@ func main() {
 			}
 		}
 	}
-	// 2. Write Go classes
-	WriteGo(pkgName, messages, messageMap, enums, enumMap)
-
-	// 3. Generate c# classes
-	// TODO: C# doesn't support enums yet
-	// WriteCS(messages, messageMap)
-	if *gendart {
-		WriteDartBindings(pkgName, messages, messageMap, enums, enumMap)
-		WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
+	for _, l := range strings.Split(*genlist, ",") {
+		switch l {
+		case "go":
+			WriteGo(pkgName, messages, messageMap, enums, enumMap)
+		case "dart":
+			WriteDartBindings(pkgName, messages, messageMap, enums, enumMap)
+			WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
+		case "js":
+			WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
+		case "cs":
+			// WriteCS(messages, messageMap)
+		}
 	}
 }
 
