@@ -245,6 +245,27 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 	for i := 0; i < scopeDepth; i++ {
 		buf.WriteString("\t")
 	}
+
+	if f.Array && f.Type != ByteType { // Specially handle byte array type.
+		// Array!
+		writeArrayLen(f, scopeDepth, buf)
+		fn := "v" + strconv.Itoa(scopeDepth+1)
+		buf.WriteString("for _, ")
+		buf.WriteString(fn)
+		buf.WriteString(" := range ")
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(f.Name)
+		buf.WriteString(" {\n")
+		WriteGoSerialize(MessageField{Name: fn, Type: f.Type, Order: f.Order, Pointer: f.Pointer}, scopeDepth+1, buf, messages, enums)
+		for i := 0; i < scopeDepth; i++ {
+			buf.WriteString("\t")
+		}
+		buf.WriteString("}\n")
+		return
+	}
+
 	switch f.Type {
 	case ByteType:
 		if f.Array {
@@ -324,24 +345,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString(f.Name)
 		buf.WriteString(".Len()\n")
 	default:
-		if f.Array {
-			// Array!
-			writeArrayLen(f, scopeDepth, buf)
-			fn := "v" + strconv.Itoa(scopeDepth+1)
-			buf.WriteString("for _, ")
-			buf.WriteString(fn)
-			buf.WriteString(" := range ")
-			if scopeDepth == 1 {
-				buf.WriteString("m.")
-			}
-			buf.WriteString(f.Name)
-			buf.WriteString(" {\n")
-			WriteGoSerialize(MessageField{Name: fn, Type: f.Type, Order: f.Order, Pointer: f.Pointer}, scopeDepth+1, buf, messages, enums)
-			for i := 0; i < scopeDepth; i++ {
-				buf.WriteString("\t")
-			}
-			buf.WriteString("}\n")
-		} else if _, ok := messages[f.Type]; ok {
+		if _, ok := messages[f.Type]; ok {
 			// Custom message deserial here.
 			if scopeDepth == 1 {
 				buf.WriteString("m.")
@@ -402,6 +406,44 @@ func writeArrayLenRead(lname string, scopeDepth int, buf *bytes.Buffer) {
 func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[string]Message, enums map[string]Enum) {
 	for i := 0; i < scopeDepth; i++ {
 		buf.WriteString("\t")
+	}
+	if f.Array && f.Type != ByteType { // handle byte array specially
+		// Get len of array
+		lname := "l" + strconv.Itoa(f.Order) + "_" + strconv.Itoa(scopeDepth)
+		writeArrayLenRead(lname, scopeDepth, buf)
+
+		// 	// Create array variable
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(f.Name)
+		buf.WriteString(" = make([]")
+		if f.Pointer {
+			buf.WriteString("*")
+		}
+		buf.WriteString(f.Type)
+		buf.WriteString(", ")
+		buf.WriteString(lname)
+		buf.WriteString(")\n")
+		//
+		// Read each var into the array in loop
+		for i := 0; i < scopeDepth; i++ {
+			buf.WriteString("\t")
+		}
+		buf.WriteString("for i := 0; i < int(")
+		buf.WriteString(lname)
+		buf.WriteString("); i++ {\n")
+		fn := ""
+		if scopeDepth == 1 {
+			fn += "m."
+		}
+		fn += f.Name + "[i]"
+		WriteGoDeserial(MessageField{Name: fn, Type: f.Type, Pointer: f.Pointer}, scopeDepth+1, buf, messages, enums)
+		for i := 0; i < scopeDepth; i++ {
+			buf.WriteString("\t")
+		}
+		buf.WriteString("}\n")
+		return
 	}
 	switch f.Type {
 	case ByteType:
@@ -494,43 +536,7 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 		buf.WriteString(".Len()\n")
 
 	default:
-		if f.Array {
-			// Get len of array
-			lname := "l" + strconv.Itoa(f.Order) + "_" + strconv.Itoa(scopeDepth)
-			writeArrayLenRead(lname, scopeDepth, buf)
-
-			// 	// Create array variable
-			if scopeDepth == 1 {
-				buf.WriteString("m.")
-			}
-			buf.WriteString(f.Name)
-			buf.WriteString(" = make([]")
-			if f.Pointer {
-				buf.WriteString("*")
-			}
-			buf.WriteString(f.Type)
-			buf.WriteString(", ")
-			buf.WriteString(lname)
-			buf.WriteString(")\n")
-			//
-			// Read each var into the array in loop
-			for i := 0; i < scopeDepth; i++ {
-				buf.WriteString("\t")
-			}
-			buf.WriteString("for i := 0; i < int(")
-			buf.WriteString(lname)
-			buf.WriteString("); i++ {\n")
-			fn := ""
-			if scopeDepth == 1 {
-				fn += "m."
-			}
-			fn += f.Name + "[i]"
-			WriteGoDeserial(MessageField{Name: fn, Type: f.Type, Pointer: f.Pointer}, scopeDepth+1, buf, messages, enums)
-			for i := 0; i < scopeDepth; i++ {
-				buf.WriteString("\t")
-			}
-			buf.WriteString("}\n")
-		} else if _, ok := messages[f.Type]; ok {
+		if _, ok := messages[f.Type]; ok {
 			// 	// Custom message deserial here.
 			if f.Pointer {
 				subName := "sub" + f.Name

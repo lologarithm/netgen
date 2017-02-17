@@ -75,8 +75,14 @@ func WriteJSConvertField(buf *bytes.Buffer, pkgname string, f MessageField, subi
 		if f.Pointer {
 			buf.WriteString("*")
 		}
-		buf.WriteString(pkgname)
-		buf.WriteString(".")
+		switch f.Type {
+		case ByteType, Int16Type, Int32Type, Int64Type:
+		case Uint16Type, Uint32Type, Uint64Type:
+		case StringType:
+		default:
+			buf.WriteString(pkgname)
+			buf.WriteString(".")
+		}
 		buf.WriteString(f.Type)
 		buf.WriteString(", ")
 		sublen := fmt.Sprintf("jso.Get(\"%s\").Length()", f.Name)
@@ -102,11 +108,7 @@ func WriteJSConvertField(buf *bytes.Buffer, pkgname string, f MessageField, subi
 	} else if _, ok := enumMap[f.Type]; ok {
 		buf.WriteString(fmt.Sprintf("%s = %s(jso.%s.Int64())", setname, pkgname+"."+f.Type, getname))
 	} else {
-		if scopeDepth == 1 {
-			buf.WriteString("m.")
-		}
-
-		buf.WriteString(fmt.Sprintf("%s = ", f.Name))
+		buf.WriteString(fmt.Sprintf("%s = ", setname))
 		switch f.Type {
 		case ByteType, Int16Type, Int32Type, Int64Type:
 			buf.WriteString(fmt.Sprintf("%s(jso.%s.Int64())", f.Type, getname))
