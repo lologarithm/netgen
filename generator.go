@@ -15,11 +15,6 @@ var input = flag.String("input", "", "Input defition file to generate from")
 func main() {
 	flag.Parse()
 
-	messages := []Message{}
-	enums := []Enum{}
-	messageMap := map[string]Message{}
-	enumMap := map[string]Enum{}
-
 	// 1. Read defs.ng
 	inputFile := "defs.ng"
 	if *input != "" {
@@ -30,6 +25,29 @@ func main() {
 		log.Printf("Failed to read definition file: %s", err)
 		return
 	}
+
+	pkgName, messages, enums, messageMap, enumMap := parseNG(data)
+	for _, l := range strings.Split(*genlist, ",") {
+		switch l {
+		case "go":
+			WriteGo(pkgName, messages, messageMap, enums, enumMap)
+		case "dart":
+			WriteDartBindings(pkgName, messages, messageMap, enums, enumMap)
+			WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
+		case "js":
+			WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
+		case "cs":
+			// WriteCS(messages, messageMap)
+		}
+	}
+}
+
+func parseNG(data []byte) (string, []Message, []Enum, map[string]Message, map[string]Enum) {
+	messages := []Message{}
+	enums := []Enum{}
+	messageMap := map[string]Message{}
+	enumMap := map[string]Enum{}
+
 	// Parse types
 	lines := strings.Split(string(data), "\n")
 	pkgName := "netgen"
@@ -110,19 +128,8 @@ func main() {
 			}
 		}
 	}
-	for _, l := range strings.Split(*genlist, ",") {
-		switch l {
-		case "go":
-			WriteGo(pkgName, messages, messageMap, enums, enumMap)
-		case "dart":
-			WriteDartBindings(pkgName, messages, messageMap, enums, enumMap)
-			WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
-		case "js":
-			WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
-		case "cs":
-			// WriteCS(messages, messageMap)
-		}
-	}
+
+	return pkgName, messages, enums, messageMap, enumMap
 }
 
 // Message is a message that can be serialized across network.
