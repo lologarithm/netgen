@@ -100,15 +100,15 @@ func parseNG(data []byte) (string, []Message, []Enum, map[string]Message, map[st
 					field.Pointer = true
 				}
 				switch field.Type {
-				case "byte":
+				case ByteType:
 					field.Size = 1
-				case "uint16", "int16":
+				case Uint16Type, Int16Type:
 					field.Size = 2
-				case "uint32", "int32":
+				case Uint32Type, Int32Type:
 					field.Size = 4
-				case "uint64", "int64", "float64":
+				case Uint64Type, Int64Type, Float64Type:
 					field.Size = 8
-				case "string":
+				case StringType:
 					field.Size = 4
 				}
 				message.SelfSize += field.Size
@@ -159,6 +159,7 @@ type MessageField struct {
 	Size    int
 }
 
+// Supported type strings for netgen.
 const (
 	StringType  string = "string"
 	ByteType    string = "byte"
