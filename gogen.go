@@ -118,6 +118,27 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 	for i := 0; i < scopeDepth; i++ {
 		buf.WriteString("\t")
 	}
+	if f.Array && f.Type != ByteType { // array handling for non-byte type
+		buf.WriteString("mylen += 4\n\t")
+		fn := "v" + strconv.Itoa(scopeDepth+1)
+		buf.WriteString("for _, ")
+		buf.WriteString(fn)
+		buf.WriteString(" := range ")
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(f.Name)
+		buf.WriteString(" {\n")
+		buf.WriteString("\t_ = ")
+		buf.WriteString(fn)
+		buf.WriteString("\n")
+		WriteGoLen(MessageField{Name: fn, Type: f.Type, Order: f.Order, Pointer: f.Pointer}, scopeDepth+1, buf, messages, enums)
+		for i := 0; i < scopeDepth; i++ {
+			buf.WriteString("\t")
+		}
+		buf.WriteString("}\n")
+		return
+	}
 	switch f.Type {
 	case ByteType:
 		if f.Array {
@@ -151,26 +172,7 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 		buf.WriteString(f.Name)
 		buf.WriteString(".Len()")
 	default:
-		if f.Array {
-			buf.WriteString("mylen += 4\n\t")
-			fn := "v" + strconv.Itoa(scopeDepth+1)
-			buf.WriteString("for _, ")
-			buf.WriteString(fn)
-			buf.WriteString(" := range ")
-			if scopeDepth == 1 {
-				buf.WriteString("m.")
-			}
-			buf.WriteString(f.Name)
-			buf.WriteString(" {\n")
-			buf.WriteString("\t_ = ")
-			buf.WriteString(fn)
-			buf.WriteString("\n")
-			WriteGoLen(MessageField{Name: fn, Type: f.Type, Order: f.Order, Pointer: f.Pointer}, scopeDepth+1, buf, messages, enums)
-			for i := 0; i < scopeDepth; i++ {
-				buf.WriteString("\t")
-			}
-			buf.WriteString("}\n")
-		} else if _, ok := messages[f.Type]; ok {
+		if _, ok := messages[f.Type]; ok {
 			buf.WriteString("mylen += ")
 			if scopeDepth == 1 {
 				buf.WriteString("m.")
