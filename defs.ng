@@ -2,19 +2,28 @@ package netmsg
 
 struct Multipart {
     ID  uint16
- GroupID uint32
- NumParts uint16
- Content []byte
+    GroupID uint32
+    NumParts uint16
+    Content []byte
 }
 
 struct Heartbeat {
- Time int64
- Latency int64
+    Time int64
+    Latency int64
+}
+
+struct Benchy {
+	Name     string
+	BirthDay int64
+	Phone    string
+	Siblings int32
+	Spouse   byte
+	Money    float64
 }
 
 struct Nested {
-  A SubNest
-  B *SubNest2
+    A SubNest
+    B *SubNest2
 }
 
 struct ExampleDyn {
