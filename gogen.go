@@ -8,6 +8,8 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) {
@@ -73,7 +75,7 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 			if f.Type == DynamicType {
 				gobuf.WriteString("Net")
 				gobuf.WriteString("\n\t")
-				gobuf.WriteString(f.Name)
+				gobuf.WriteString(lowerFirst(f.Name))
 				gobuf.WriteString("Type ")
 				gobuf.WriteString("MessageType")
 			} else {
@@ -165,6 +167,7 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 		buf.WriteString(f.Name)
 		buf.WriteString(")")
 	case DynamicType:
+		buf.WriteString("mylen += 2\n\t")
 		buf.WriteString("mylen += ")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
@@ -332,6 +335,22 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		writeIdxInc(f, scopeDepth, buf)
 	case DynamicType:
 		// Custom message deserial here.
+		buf.WriteString("LittleEndian.PutUint16(buffer[idx:], uint16(")
+		if scopeDepth == 1 {
+			buf.WriteString("m.")
+		}
+		buf.WriteString(f.Name)
+		buf.WriteString(".MsgType()))")
+		buf.WriteString("\n")
+		for i := 0; i < scopeDepth; i++ {
+			buf.WriteString("\t")
+		}
+		buf.WriteString("idx+=2")
+		buf.WriteString("\n")
+		for i := 0; i < scopeDepth; i++ {
+			buf.WriteString("\t")
+		}
+
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
@@ -505,8 +524,18 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 		buf.WriteString("])")
 		writeIdxInc(f, scopeDepth, buf)
 	case DynamicType:
+		pre := ""
+		if scopeDepth == 1 {
+			pre = "m."
+		}
+		mt := fmt.Sprintf("%s%sType", pre, lowerFirst(f.Name))
+
+		buf.WriteString(mt)
+		buf.WriteString(" = MessageType(LittleEndian.Uint16(buffer[idx:]))\n\t")
+		buf.WriteString("idx+=2\n\t")
+
 		//ParseNetMessage
-		buf.WriteString("p := Packet{}\n")
+		buf.WriteString(fmt.Sprintf("p := Packet{Frame: Frame{MsgType: %s}}\n", mt))
 		for i := 0; i < scopeDepth; i++ {
 			buf.WriteString("\t")
 		}
@@ -518,14 +547,6 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 		for i := 0; i < scopeDepth; i++ {
 			buf.WriteString("\t")
 		}
-		if scopeDepth == 1 {
-			buf.WriteString("m.")
-		}
-		buf.WriteString(fmt.Sprintf("%sType = ", f.Name))
-		if scopeDepth == 1 {
-			buf.WriteString("m.")
-		}
-		buf.WriteString(fmt.Sprintf("%s.MsgType()\n", f.Name))
 
 		for i := 0; i < scopeDepth; i++ {
 			buf.WriteString("\t")
@@ -598,4 +619,12 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 		}
 	}
 
+}
+
+func lowerFirst(s string) string {
+	if s == "" {
+		return ""
+	}
+	r, n := utf8.DecodeRuneInString(s)
+	return string(unicode.ToLower(r)) + s[n:]
 }
