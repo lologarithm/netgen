@@ -18,7 +18,7 @@ func WriteJSConverter(pkgname string, messages []Message, messageMap map[string]
 	}
 	gopath := path.Join(os.Getenv("GOPATH"), "src")
 	rel, err := filepath.Rel(gopath, pwd)
-	if err != nil {
+	if err != nil || rel[0] == '.' {
 		panic("Current directory not in gopath!")
 	}
 	rootpkg := path.Join(rel, pkgname)
