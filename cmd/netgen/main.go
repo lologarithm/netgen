@@ -7,6 +7,8 @@ import (
 	"log"
 	"strconv"
 	"strings"
+
+	"github.com/lologarithm/netgen/generate"
 )
 
 var genlist = flag.String("gen", "go", "list of languages to generate bindings for, separated by commas")
@@ -15,10 +17,10 @@ var input = flag.String("input", "", "Input defition file to generate from")
 func main() {
 	flag.Parse()
 
-	messages := []Message{}
-	enums := []Enum{}
-	messageMap := map[string]Message{}
-	enumMap := map[string]Enum{}
+	messages := []generate.Message{}
+	enums := []generate.Enum{}
+	messageMap := map[string]generate.Message{}
+	enumMap := map[string]generate.Enum{}
 
 	// 1. Read defs.ng
 	inputFile := "defs.ng"
@@ -33,20 +35,20 @@ func main() {
 	// Parse types
 	lines := strings.Split(string(data), "\n")
 	pkgName := "netgen"
-	message := Message{}
-	enum := Enum{}
+	message := generate.Message{}
+	enum := generate.Enum{}
 	for _, line := range lines {
 		parts := strings.Fields(line)
 		if len(parts) > 1 {
 			if parts[0] == "enum" {
 				enum.Name = parts[1]
-				if parts[1] == DynamicType {
+				if parts[1] == generate.DynamicType {
 					panic("dynamic is not valid type name")
 				}
 				continue
 			} else if parts[0] == "struct" {
 				message.Name = parts[1]
-				if parts[1] == DynamicType {
+				if parts[1] == generate.DynamicType {
 					panic("dynamic is not valid type name")
 				}
 				continue
@@ -60,15 +62,15 @@ func main() {
 				if message.Name != "" {
 					messages = append(messages, message)
 					messageMap[message.Name] = message
-					message = Message{}
+					message = generate.Message{}
 				} else if enum.Name != "" {
 					enums = append(enums, enum)
 					enumMap[enum.Name] = enum
-					enum = Enum{}
+					enum = generate.Enum{}
 				}
 			} else if len(parts) > 1 && message.Name != "" {
 				// probably a message field in format "<NAME> <TYPE>"
-				field := MessageField{
+				field := generate.MessageField{
 					Name:  parts[0],
 					Type:  parts[1],
 					Order: len(message.Fields),
@@ -102,7 +104,7 @@ func main() {
 					fmt.Printf("Trying to parse enum %s, field %s, value is not valid integer.\n", enum.Name, parts[0])
 					panic("invalid formatted definition file.")
 				}
-				ev := EnumValue{
+				ev := generate.EnumValue{
 					Name:  parts[0],
 					Value: val,
 				}
@@ -113,54 +115,14 @@ func main() {
 	for _, l := range strings.Split(*genlist, ",") {
 		switch l {
 		case "go":
-			WriteGo(pkgName, messages, messageMap, enums, enumMap)
+			generate.WriteGo(pkgName, messages, messageMap, enums, enumMap)
 		case "dart":
-			WriteDartBindings(pkgName, messages, messageMap, enums, enumMap)
-			WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
+			generate.WriteDartBindings(pkgName, messages, messageMap, enums, enumMap)
+			generate.WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
 		case "js":
-			WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
+			generate.WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
 		case "cs":
-			// WriteCS(messages, messageMap)
+			// generate.WriteCS(messages, messageMap)
 		}
 	}
 }
-
-// Message is a message that can be serialized across network.
-type Message struct {
-	Name     string
-	Fields   []MessageField
-	SelfSize int
-}
-
-type Enum struct {
-	Name   string
-	Values []EnumValue
-}
-
-type EnumValue struct {
-	Name  string
-	Value int
-}
-
-// MessageField is a single field of a message.
-type MessageField struct {
-	Name    string
-	Type    string
-	Array   bool
-	Pointer bool
-	Order   int
-	Size    int
-}
-
-const (
-	StringType  string = "string"
-	ByteType    string = "byte"
-	Int16Type   string = "int16"
-	Uint16Type  string = "uint16"
-	Int32Type   string = "int32"
-	Uint32Type  string = "uint32"
-	Int64Type   string = "int64"
-	Uint64Type  string = "uint64"
-	Float64Type string = "float64"
-	DynamicType string = "dynamic"
-)

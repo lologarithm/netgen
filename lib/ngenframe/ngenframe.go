@@ -1,4 +1,9 @@
-var LittleEndian littleEndian
+package ngenframe
+
+// Binary is the encoder for ngenframe.
+// It is simply a clone of littleEndian conversion code from std lib.
+// This is done to reduce imports so that transpiling to JS is faster
+var Binary littleEndian
 
 type littleEndian struct{}
 
@@ -70,9 +75,9 @@ type Packet struct {
 // Pack serializes the content into RawBytes.
 func (p *Packet) Pack() []byte {
 	buf := make([]byte, p.Len())
-	LittleEndian.PutUint16(buf, uint16(p.Frame.MsgType))
-	LittleEndian.PutUint16(buf[2:], p.Frame.Seq)
-	LittleEndian.PutUint16(buf[4:], p.Frame.ContentLength)
+	Binary.PutUint16(buf, uint16(p.Frame.MsgType))
+	Binary.PutUint16(buf[2:], p.Frame.Seq)
+	Binary.PutUint16(buf[4:], p.Frame.ContentLength)
 	p.NetMsg.Serialize(buf[6:])
 	return buf
 }
@@ -92,13 +97,15 @@ func ParseFrame(rawBytes []byte) (mf Frame, ok bool) {
 	if len(rawBytes) < FrameLen {
 		return
 	}
-	mf.MsgType = MessageType(LittleEndian.Uint16(rawBytes[0:2]))
-	mf.Seq = LittleEndian.Uint16(rawBytes[2:4])
-	mf.ContentLength = LittleEndian.Uint16(rawBytes[4:6])
+	mf.MsgType = MessageType(Binary.Uint16(rawBytes[0:2]))
+	mf.Seq = Binary.Uint16(rawBytes[2:4])
+	mf.ContentLength = Binary.Uint16(rawBytes[4:6])
 	return mf, true
 }
 
-func NextPacket(rawBytes []byte) (packet Packet, ok bool) {
+type NetParser func(Packet, []byte) Net
+
+func NextPacket(rawBytes []byte, parser NetParser) (packet Packet, ok bool) {
 	packet.Frame, ok = ParseFrame(rawBytes)
 	if !ok {
 		return
@@ -106,7 +113,7 @@ func NextPacket(rawBytes []byte) (packet Packet, ok bool) {
 
 	ok = false
 	if packet.Len() <= len(rawBytes) {
-		packet.NetMsg = ParseNetMessage(packet, rawBytes[FrameLen:packet.Len()])
+		packet.NetMsg = parser(packet, rawBytes[FrameLen:packet.Len()])
 		if packet.NetMsg != nil {
 			ok = true
 		}

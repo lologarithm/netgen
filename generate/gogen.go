@@ -1,4 +1,4 @@
-package main
+package generate
 
 import (
 	"bytes"
@@ -12,20 +12,31 @@ import (
 	"unicode/utf8"
 )
 
-func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) {
-	gobuf := &bytes.Buffer{}
-	gopath := os.Getenv("GOPATH")
-	f, err := ioutil.ReadFile(path.Join(gopath, "src/github.com/lologarithm/netgen/lib/go/frame.go.tmpl"))
-	if err != nil {
-		fmt.Printf("Error: %s\n", err)
-		panic("failed to load frame helper.")
+// search messages to see if we have a float64 field.
+// this will help us decide if we need to import math package.
+func hasfloat64(messages []Message) bool {
+	for _, m := range messages {
+		for _, f := range m.Fields {
+			if f.Type == Float64Type {
+				return true
+			}
+		}
 	}
-	gobuf.WriteString(fmt.Sprintf("package %s\n\nimport (\n\t\"math\"\n)\n\n", pkgname))
-	gobuf.WriteString("// Make sure math import is always valid\nvar _ = math.Pi\n\n")
-	gobuf.Write(f)
-	gobuf.WriteString("\n")
+	return false
+}
+
+// GoLibHeader will return all the bits needed to make the generated serializers/deserializers work
+// Specifically that is package name, imports, an enum of all message types, and a generic parse message function.
+func GoLibHeader(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) string {
+	gobuf := &bytes.Buffer{}
+	gobuf.WriteString(fmt.Sprintf("package %s\n\nimport (\n\t\"github.com/lologarithm/netgen/lib/ngenframe\"", pkgname))
+	if hasfloat64(messages) {
+		// only import math if we need to serial/deserial float64s
+		gobuf.WriteString("\n\t\"math\"")
+	}
+	gobuf.WriteString("\n)\n\n\n")
 	// 1. List type values!
-	gobuf.WriteString("const (\n\tUnknownMsgType MessageType = iota\n\tAckMsgType\n")
+	gobuf.WriteString("const (\n\tUnknownMsgType ngenframe.MessageType = iota\n\tAckMsgType\n")
 	for _, t := range messages {
 		gobuf.WriteString("\t")
 		gobuf.WriteString(t.Name)
@@ -35,7 +46,7 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 
 	// 1.a. Parent parser function
 	gobuf.WriteString("// ParseNetMessage accepts input of raw bytes from a NetMessage. Parses and returns a Net message.\n")
-	gobuf.WriteString("func ParseNetMessage(packet Packet, content []byte) Net {\n")
+	gobuf.WriteString("func ParseNetMessage(packet ngenframe.Packet, content []byte) ngenframe.Net {\n")
 	gobuf.WriteString("\tswitch packet.Frame.MsgType {\n")
 	for _, t := range messages {
 		gobuf.WriteString("\tcase ")
@@ -46,6 +57,76 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 		gobuf.WriteString("Deserialize(content)\n\t\treturn &msg\n")
 	}
 	gobuf.WriteString("\tdefault:\n\t\treturn nil\n\t}\n}\n\n")
+	return gobuf.String()
+}
+
+// GoType will write a generated go struct that represents input msg
+func GoType(msg Message) string {
+	gobuf := &bytes.Buffer{}
+	gobuf.WriteString("type ")
+	gobuf.WriteString(msg.Name)
+	gobuf.WriteString(" struct {")
+	for _, f := range msg.Fields {
+		gobuf.WriteString("\n\t")
+		gobuf.WriteString(f.Name)
+		gobuf.WriteString(" ")
+		if f.Array {
+			gobuf.WriteString("[]")
+		}
+		if f.Pointer {
+			gobuf.WriteString("*")
+		}
+		if f.Type == DynamicType {
+			gobuf.WriteString("Net")
+			gobuf.WriteString("\n\t")
+			gobuf.WriteString(lowerFirst(f.Name))
+			gobuf.WriteString("Type ")
+			gobuf.WriteString("ngenframe.MessageType")
+		} else {
+			gobuf.WriteString(f.Type)
+		}
+	}
+	gobuf.WriteString("\n}")
+	return gobuf.String()
+}
+
+// GoTypeFuncs returns the generated code of Serialize, Deserialize, Len, and MessageType for the input msg
+func GoTypeFuncs(msg Message, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) string {
+	gobuf := &bytes.Buffer{}
+	gobuf.WriteString(fmt.Sprintf("\n\nfunc (m %s) Serialize(buffer []byte) {\n", msg.Name))
+	if len(msg.Fields) > 0 {
+		gobuf.WriteString("\tidx := 0\n")
+	}
+	for _, f := range msg.Fields {
+		WriteGoSerializeField(f, 1, gobuf, messageMap, enumMap)
+	}
+	gobuf.WriteString("}\n")
+	gobuf.WriteString(fmt.Sprintf("\nfunc %sDeserialize(buffer []byte) (m %s) {\n", msg.Name, msg.Name))
+	if len(msg.Fields) > 0 {
+		gobuf.WriteString("\tidx := 0\n")
+	}
+	for _, f := range msg.Fields {
+		WriteGoDeserialField(f, 1, gobuf, messageMap, enumMap)
+	}
+	gobuf.WriteString("\treturn m\n}\n")
+	gobuf.WriteString(fmt.Sprintf("\nfunc (m %s) Len() int {\n\tmylen := 0\n", msg.Name))
+	for _, f := range msg.Fields {
+		WriteGoLen(f, 1, gobuf, messageMap, enumMap)
+	}
+	gobuf.WriteString("\treturn mylen\n}\n\n")
+
+	gobuf.WriteString("func (m ")
+	gobuf.WriteString(msg.Name)
+	gobuf.WriteString(") MsgType() ngenframe.MessageType {\n\treturn ")
+	gobuf.WriteString(msg.Name)
+	gobuf.WriteString("MsgType\n}\n\n")
+	return gobuf.String()
+}
+
+// WriteGo will create a new file and write all the types and functions
+func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) {
+	gobuf := &bytes.Buffer{}
+	gobuf.WriteString(GoLibHeader(pkgname, messages, messageMap, enums, enumMap))
 
 	for _, enum := range enums {
 		gobuf.WriteString("type ")
@@ -59,58 +140,8 @@ func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, 
 
 	// 2. Generate go classes
 	for _, msg := range messages {
-		gobuf.WriteString("type ")
-		gobuf.WriteString(msg.Name)
-		gobuf.WriteString(" struct {")
-		for _, f := range msg.Fields {
-			gobuf.WriteString("\n\t")
-			gobuf.WriteString(f.Name)
-			gobuf.WriteString(" ")
-			if f.Array {
-				gobuf.WriteString("[]")
-			}
-			if f.Pointer {
-				gobuf.WriteString("*")
-			}
-			if f.Type == DynamicType {
-				gobuf.WriteString("Net")
-				gobuf.WriteString("\n\t")
-				gobuf.WriteString(lowerFirst(f.Name))
-				gobuf.WriteString("Type ")
-				gobuf.WriteString("MessageType")
-			} else {
-				gobuf.WriteString(f.Type)
-			}
-
-		}
-		gobuf.WriteString(fmt.Sprintf("\n}\n\nfunc (m %s) Serialize(buffer []byte) {\n", msg.Name))
-		if len(msg.Fields) > 0 {
-			gobuf.WriteString("\tidx := 0\n")
-		}
-		for _, f := range msg.Fields {
-			WriteGoSerialize(f, 1, gobuf, messageMap, enumMap)
-		}
-		gobuf.WriteString("}\n")
-		gobuf.WriteString(fmt.Sprintf("\nfunc %sDeserialize(buffer []byte) (m %s) {\n", msg.Name, msg.Name))
-		if len(msg.Fields) > 0 {
-			gobuf.WriteString("\tidx := 0\n")
-		}
-		for _, f := range msg.Fields {
-			WriteGoDeserial(f, 1, gobuf, messageMap, enumMap)
-		}
-		gobuf.WriteString("\treturn m\n}\n")
-		gobuf.WriteString(fmt.Sprintf("\nfunc (m %s) Len() int {\n\tmylen := 0\n", msg.Name))
-		for _, f := range msg.Fields {
-			WriteGoLen(f, 1, gobuf, messageMap, enumMap)
-		}
-		gobuf.WriteString("\treturn mylen\n}\n\n")
-
-		gobuf.WriteString("func (m ")
-		gobuf.WriteString(msg.Name)
-		gobuf.WriteString(") MsgType() MessageType {\n\treturn ")
-		gobuf.WriteString(msg.Name)
-		gobuf.WriteString("MsgType\n}\n\n")
-
+		gobuf.WriteString(GoType(msg))
+		gobuf.WriteString(GoTypeFuncs(msg, messages, messageMap, enums, enumMap))
 	}
 	os.MkdirAll(pkgname, 0777)
 	ioutil.WriteFile(path.Join(pkgname, pkgname+".go"), gobuf.Bytes(), 0666)
@@ -142,7 +173,7 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 		return
 	}
 	switch f.Type {
-	case ByteType:
+	case ByteType, BoolType:
 		if f.Array {
 			buf.WriteString("mylen += 4 + len(")
 			if scopeDepth == 1 {
@@ -155,7 +186,7 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 		}
 	case Uint16Type, Int16Type:
 		buf.WriteString("mylen += 2")
-	case Uint32Type, Int32Type:
+	case Uint32Type, Int32Type, RuneType, IntType:
 		buf.WriteString("mylen += 4")
 	case Uint64Type, Int64Type, Float64Type:
 		buf.WriteString("mylen += 8")
@@ -173,7 +204,7 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 			buf.WriteString("m.")
 		}
 		buf.WriteString(f.Name)
-		buf.WriteString(".Len()")
+		buf.WriteString(".(ngenframe.Net).Len()")
 	default:
 		if _, ok := messages[f.Type]; ok {
 			buf.WriteString("mylen += ")
@@ -190,7 +221,7 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 }
 
 func writeArrayLen(f MessageField, scopeDepth int, buf *bytes.Buffer) {
-	buf.WriteString("LittleEndian.PutUint32(buffer[idx:], uint32(len(")
+	buf.WriteString("ngenframe.Binary.PutUint32(buffer[idx:], uint32(len(")
 	if scopeDepth == 1 {
 		buf.WriteString("m.")
 	}
@@ -212,7 +243,7 @@ func writeIdxInc(f MessageField, scopeDepth int, buf *bytes.Buffer) {
 	}
 	buf.WriteString("idx+=")
 	switch f.Type {
-	case ByteType:
+	case ByteType, BoolType:
 		if f.Array {
 			buf.WriteString("len(")
 			if scopeDepth == 1 {
@@ -225,7 +256,7 @@ func writeIdxInc(f MessageField, scopeDepth int, buf *bytes.Buffer) {
 		}
 	case Int16Type, Uint16Type:
 		buf.WriteString("2")
-	case Int32Type, Uint32Type:
+	case Int32Type, Uint32Type, RuneType, IntType:
 		buf.WriteString("4")
 	case Int64Type, Uint64Type, Float64Type:
 		buf.WriteString("8")
@@ -246,12 +277,12 @@ func writeIdxInc(f MessageField, scopeDepth int, buf *bytes.Buffer) {
 	buf.WriteString("\n")
 }
 
-func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[string]Message, enums map[string]Enum) {
+func WriteGoSerializeField(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[string]Message, enums map[string]Enum) {
 	for i := 0; i < scopeDepth; i++ {
 		buf.WriteString("\t")
 	}
 
-	if f.Array && f.Type != ByteType { // Specially handle byte array type.
+	if f.Array && f.Type != ByteType { // Specially handle byte/bool array type.
 		// Array!
 		writeArrayLen(f, scopeDepth, buf)
 		fn := "v" + strconv.Itoa(scopeDepth+1)
@@ -263,7 +294,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		}
 		buf.WriteString(f.Name)
 		buf.WriteString(" {\n")
-		WriteGoSerialize(MessageField{Name: fn, Type: f.Type, Order: f.Order, Pointer: f.Pointer}, scopeDepth+1, buf, messages, enums)
+		WriteGoSerializeField(MessageField{Name: fn, Type: f.Type, Order: f.Order, Pointer: f.Pointer}, scopeDepth+1, buf, messages, enums)
 		for i := 0; i < scopeDepth; i++ {
 			buf.WriteString("\t")
 		}
@@ -292,16 +323,23 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 			buf.WriteString(f.Name)
 			writeIdxInc(f, scopeDepth, buf)
 		}
+	case BoolType:
+		typename := f.Name
+		if scopeDepth == 1 {
+			typename = "m." + typename
+		}
+		buf.WriteString(fmt.Sprintf("if %s { buffer[idx] = 1 }", typename))
+		writeIdxInc(f, scopeDepth, buf)
 	case Int16Type, Uint16Type:
-		buf.WriteString("LittleEndian.PutUint16(buffer[idx:], uint16(")
+		buf.WriteString("ngenframe.Binary.PutUint16(buffer[idx:], uint16(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
 		buf.WriteString(f.Name)
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
-	case Int32Type, Uint32Type:
-		buf.WriteString("LittleEndian.PutUint32(buffer[idx:], uint32(")
+	case Int32Type, Uint32Type, RuneType, IntType:
+		buf.WriteString("ngenframe.Binary.PutUint32(buffer[idx:], uint32(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
@@ -309,7 +347,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
 	case Int64Type, Uint64Type:
-		buf.WriteString("LittleEndian.PutUint64(buffer[idx:], uint64(")
+		buf.WriteString("ngenframe.Binary.PutUint64(buffer[idx:], uint64(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
@@ -317,7 +355,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		buf.WriteString("))")
 		writeIdxInc(f, scopeDepth, buf)
 	case Float64Type:
-		buf.WriteString("LittleEndian.PutUint64(buffer[idx:], math.Float64bits(")
+		buf.WriteString("ngenframe.Binary.PutUint64(buffer[idx:], math.Float64bits(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
@@ -335,7 +373,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 		writeIdxInc(f, scopeDepth, buf)
 	case DynamicType:
 		// Custom message deserial here.
-		buf.WriteString("LittleEndian.PutUint16(buffer[idx:], uint16(")
+		buf.WriteString("ngenframe.Binary.PutUint16(buffer[idx:], uint16(")
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
@@ -355,7 +393,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 			buf.WriteString("m.")
 		}
 		buf.WriteString(f.Name)
-		buf.WriteString(".Serialize(buffer[idx:])\n")
+		buf.WriteString(".(ngenframe.Net).Serialize(buffer[idx:])\n")
 		for i := 0; i < scopeDepth; i++ {
 			buf.WriteString("\t")
 		}
@@ -364,7 +402,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 			buf.WriteString("m.")
 		}
 		buf.WriteString(f.Name)
-		buf.WriteString(".Len()\n")
+		buf.WriteString(".(ngenframe.Net).Len()\n")
 	default:
 		if _, ok := messages[f.Type]; ok {
 			// Custom message deserial here.
@@ -383,7 +421,7 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 			buf.WriteString(f.Name)
 			buf.WriteString(".Len()\n")
 		} else if _, ok := enums[f.Type]; ok {
-			buf.WriteString("LittleEndian.PutUint32(buffer[idx:], uint32(")
+			buf.WriteString("ngenframe.Binary.PutUint32(buffer[idx:], uint32(")
 			if scopeDepth == 1 {
 				buf.WriteString("m.")
 			}
@@ -394,16 +432,32 @@ func WriteGoSerialize(f MessageField, scopeDepth int, buf *bytes.Buffer, message
 				buf.WriteString("\t")
 			}
 			buf.WriteString("idx+=4\n")
+		} else {
+			fmt.Printf("can't serialize %s!??!\n", f.Type)
+			if scopeDepth == 1 {
+				buf.WriteString("m.")
+			}
+			buf.WriteString(f.Name)
+			buf.WriteString(".Serialize(buffer[idx:])\n")
+			for i := 0; i < scopeDepth; i++ {
+				buf.WriteString("\t")
+			}
+			buf.WriteString("idx+=")
+			if scopeDepth == 1 {
+				buf.WriteString("m.")
+			}
+			buf.WriteString(f.Name)
+			buf.WriteString(".Len()\n")
 		}
 	}
 }
 
 func writeNumericDeserialFunc(f MessageField, scopeDepth int, buf *bytes.Buffer) {
-	buf.WriteString("LittleEndian.")
+	buf.WriteString("ngenframe.Binary.")
 	switch f.Type {
 	case Int16Type, Uint16Type:
 		buf.WriteString("Uint16(")
-	case Int32Type, Uint32Type:
+	case Int32Type, Uint32Type, RuneType, IntType:
 		buf.WriteString("Uint32(")
 	case Int64Type, Uint64Type, Float64Type:
 		buf.WriteString("Uint64(")
@@ -414,7 +468,7 @@ func writeNumericDeserialFunc(f MessageField, scopeDepth int, buf *bytes.Buffer)
 
 func writeArrayLenRead(lname string, scopeDepth int, buf *bytes.Buffer) {
 	buf.WriteString(lname)
-	buf.WriteString(" := int(LittleEndian.Uint32(buffer[idx:]))\n")
+	buf.WriteString(" := int(ngenframe.Binary.Uint32(buffer[idx:]))\n")
 	for i := 0; i < scopeDepth; i++ {
 		buf.WriteString("\t")
 	}
@@ -424,7 +478,7 @@ func writeArrayLenRead(lname string, scopeDepth int, buf *bytes.Buffer) {
 	}
 }
 
-func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[string]Message, enums map[string]Enum) {
+func WriteGoDeserialField(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[string]Message, enums map[string]Enum) {
 	for i := 0; i < scopeDepth; i++ {
 		buf.WriteString("\t")
 	}
@@ -459,7 +513,7 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 			fn += "m."
 		}
 		fn += f.Name + "[i]"
-		WriteGoDeserial(MessageField{Name: fn, Type: f.Type, Pointer: f.Pointer}, scopeDepth+1, buf, messages, enums)
+		WriteGoDeserialField(MessageField{Name: fn, Type: f.Type, Pointer: f.Pointer}, scopeDepth+1, buf, messages, enums)
 		for i := 0; i < scopeDepth; i++ {
 			buf.WriteString("\t")
 		}
@@ -493,21 +547,21 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 			buf.WriteString(" = buffer[idx]\n")
 			writeIdxInc(f, scopeDepth, buf)
 		}
-	case Int16Type, Int32Type, Int64Type, Uint16Type, Uint32Type, Uint64Type, Float64Type:
+	case Int16Type, Int32Type, Int64Type, Uint16Type, Uint32Type, Uint64Type, Float64Type, RuneType, IntType:
 		if scopeDepth == 1 {
 			buf.WriteString("m.")
 		}
 		buf.WriteString(f.Name)
 		buf.WriteString(" = ")
 		switch f.Type {
-		case Int16Type, Int32Type, Int64Type:
+		case Int16Type, Int32Type, Int64Type, RuneType, IntType:
 			buf.WriteString(f.Type)
 			buf.WriteString("(")
 		case Float64Type:
 			buf.WriteString("math.Float64frombits(")
 		}
 		writeNumericDeserialFunc(f, scopeDepth, buf)
-		if f.Type[0] == 'i' || f.Type[0] == 'f' {
+		if f.Type[0] == 'i' || f.Type[0] == 'f' || f.Type[0] == 'r' {
 			buf.WriteString(")")
 		}
 		writeIdxInc(f, scopeDepth, buf)
@@ -524,43 +578,15 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 		buf.WriteString("])")
 		writeIdxInc(f, scopeDepth, buf)
 	case DynamicType:
-		pre := ""
-		if scopeDepth == 1 {
-			pre = "m."
-		}
-		mt := fmt.Sprintf("%s%sType", pre, lowerFirst(f.Name))
-
-		buf.WriteString(mt)
-		buf.WriteString(" = MessageType(LittleEndian.Uint16(buffer[idx:]))\n\t")
-		buf.WriteString("idx+=2\n\t")
-
-		//ParseNetMessage
-		buf.WriteString(fmt.Sprintf("p := Packet{Frame: Frame{MsgType: %s}}\n", mt))
-		for i := 0; i < scopeDepth; i++ {
-			buf.WriteString("\t")
-		}
-		if scopeDepth == 1 {
-			buf.WriteString("m.")
-		}
-		buf.WriteString(f.Name)
-		buf.WriteString(" = ParseNetMessage(p, buffer[idx:])\n")
-		for i := 0; i < scopeDepth; i++ {
-			buf.WriteString("\t")
-		}
-
-		for i := 0; i < scopeDepth; i++ {
-			buf.WriteString("\t")
-		}
-		buf.WriteString("idx+=")
-		if scopeDepth == 1 {
-			buf.WriteString("m.")
-		}
-		buf.WriteString(f.Name)
-		buf.WriteString(".Len()\n")
-
+		writeDynDeserial(buf, f, scopeDepth)
 	default:
+		if f.Interface {
+			writeInterDeserial(buf, f, scopeDepth)
+			return
+		}
+
 		if _, ok := messages[f.Type]; ok {
-			// 	// Custom message deserial here.
+			// Custom message deserial here.
 			if f.Pointer {
 				subName := "sub" + f.Name
 				if strings.Contains(f.Name, "[") {
@@ -607,7 +633,7 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 			buf.WriteString(" = ")
 			buf.WriteString(f.Type)
 			buf.WriteString("(")
-			buf.WriteString("LittleEndian.")
+			buf.WriteString("ngenframe.Binary.")
 			buf.WriteString("Uint32(")
 			buf.WriteString("buffer[idx:]")
 			buf.WriteString("))")
@@ -618,7 +644,75 @@ func WriteGoDeserial(f MessageField, scopeDepth int, buf *bytes.Buffer, messages
 			buf.WriteString("idx+=4\n")
 		}
 	}
+}
 
+// writeInterDeserial is just like write dynamic deserial except its for when the underlying type
+// is an interface instead of a struct.
+func writeInterDeserial(buf *bytes.Buffer, f MessageField, scopeDepth int) {
+	mt := fmt.Sprintf("iType%d", f.Order)
+	buf.WriteString(mt)
+	buf.WriteString(" := ngenframe.MessageType(ngenframe.Binary.Uint16(buffer[idx:]))\n\t")
+	buf.WriteString("idx+=2\n\t")
+
+	//ParseNetMessage
+	buf.WriteString(fmt.Sprintf("p := ngenframe.Packet{Frame: ngenframe.Frame{MsgType: %s}}\n", mt))
+	for i := 0; i < scopeDepth; i++ {
+		buf.WriteString("\t")
+	}
+	if scopeDepth == 1 {
+		buf.WriteString("m.")
+	}
+	buf.WriteString(f.Name)
+	buf.WriteString(fmt.Sprintf(" = ParseNetMessage(p, buffer[idx:]).(%s)\n", f.Type))
+	for i := 0; i < scopeDepth; i++ {
+		buf.WriteString("\t")
+	}
+
+	for i := 0; i < scopeDepth; i++ {
+		buf.WriteString("\t")
+	}
+	buf.WriteString("idx+=")
+	if scopeDepth == 1 {
+		buf.WriteString("m.")
+	}
+	buf.WriteString(f.Name)
+	buf.WriteString(".(ngenframe.Net).Len()\n")
+}
+
+func writeDynDeserial(buf *bytes.Buffer, f MessageField, scopeDepth int) {
+	pre := ""
+	if scopeDepth == 1 {
+		pre = "m."
+	}
+	mt := fmt.Sprintf("%s%sType", pre, lowerFirst(f.Name))
+
+	buf.WriteString(mt)
+	buf.WriteString(" = ngenframe.MessageType(ngenframe.Binary.Uint16(buffer[idx:]))\n\t")
+	buf.WriteString("idx+=2\n\t")
+
+	//ParseNetMessage
+	buf.WriteString(fmt.Sprintf("p := ngenframe.Packet{Frame: ngenframe.Frame{MsgType: %s}}\n", mt))
+	for i := 0; i < scopeDepth; i++ {
+		buf.WriteString("\t")
+	}
+	if scopeDepth == 1 {
+		buf.WriteString("m.")
+	}
+	buf.WriteString(f.Name)
+	buf.WriteString(" = ParseNetMessage(p, buffer[idx:])\n")
+	for i := 0; i < scopeDepth; i++ {
+		buf.WriteString("\t")
+	}
+
+	for i := 0; i < scopeDepth; i++ {
+		buf.WriteString("\t")
+	}
+	buf.WriteString("idx+=")
+	if scopeDepth == 1 {
+		buf.WriteString("m.")
+	}
+	buf.WriteString(f.Name)
+	buf.WriteString(".(ngenframe.Net).Len()\n")
 }
 
 func lowerFirst(s string) string {
