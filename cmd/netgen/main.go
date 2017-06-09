@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -115,7 +118,7 @@ func main() {
 	for _, l := range strings.Split(*genlist, ",") {
 		switch l {
 		case "go":
-			generate.WriteGo(pkgName, messages, messageMap, enums, enumMap)
+			WriteGo(pkgName, messages, messageMap, enums, enumMap)
 		case "dart":
 			generate.WriteDartBindings(pkgName, messages, messageMap, enums, enumMap)
 			generate.WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
@@ -125,4 +128,29 @@ func main() {
 			// generate.WriteCS(messages, messageMap)
 		}
 	}
+}
+
+// WriteGo will create a new file and write all the types and functions
+func WriteGo(pkgname string, messages []generate.Message, messageMap map[string]generate.Message, enums []generate.Enum, enumMap map[string]generate.Enum) {
+	gobuf := &bytes.Buffer{}
+	gobuf.WriteString(generate.GoLibHeader(pkgname, messages, messageMap, enums, enumMap))
+
+	for _, enum := range enums {
+		gobuf.WriteString("type ")
+		gobuf.WriteString(enum.Name)
+		gobuf.WriteString(" int\n\nconst(")
+		for _, ev := range enum.Values {
+			gobuf.WriteString(fmt.Sprintf("\n\t%s\t %s = %d", ev.Name, enum.Name, ev.Value))
+		}
+		gobuf.WriteString("\n)\n\n")
+	}
+
+	// 2. Generate go classes
+	for _, msg := range messages {
+		gobuf.WriteString(generate.GoType(msg))
+		gobuf.WriteString(generate.GoSerializers(msg, messages, messageMap, enums, enumMap))
+		gobuf.WriteString(generate.GoDeserializers(msg, messages, messageMap, enums, enumMap))
+	}
+	os.MkdirAll(pkgname, 0777)
+	ioutil.WriteFile(path.Join(pkgname, pkgname+".go"), gobuf.Bytes(), 0666)
 }

@@ -199,18 +199,23 @@ func main() {
 	for _, l := range strings.Split(*genlist, ",") {
 		switch l {
 		case "go":
-			outpkg := ""
 			if outdir == nil || *outdir == "" {
 				outdir = dir
 			}
-			outpkg = filepath.Base(outpkg)
+			outpkg := filepath.Base(*outdir)
 			buf := &bytes.Buffer{}
 			buf.WriteString(generate.GoLibHeader(outpkg, messages, messageMap, enums, enumMap))
-			ioutil.WriteFile(filepath.Join(outpkg, "deserial.go"), buf.Bytes(), 0644)
-			buf.Reset()
 
 			for _, msg := range messages {
-				buf.WriteString(generate.GoTypeFuncs(msg, messages, messageMap, enums, enumMap))
+				buf.WriteString(generate.GoDeserializers(msg, messages, messageMap, enums, enumMap))
+			}
+
+			ioutil.WriteFile(filepath.Join(filepath.Join(wd, *outdir), "deserial.go"), buf.Bytes(), 0644)
+
+			buf.Reset()
+			buf.WriteString(fmt.Sprintf("package %s\n\nimport \"github.com/lologarithm/netgen/lib/ngenframe\"", pkgname))
+			for _, msg := range messages {
+				buf.WriteString(generate.GoSerializers(msg, messages, messageMap, enums, enumMap))
 			}
 			ioutil.WriteFile(filepath.Join(pkgpath, "gongen.go"), buf.Bytes(), 0644)
 		case "dart":

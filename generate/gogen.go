@@ -3,9 +3,6 @@ package generate
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path"
 	"strconv"
 	"strings"
 	"unicode"
@@ -90,8 +87,8 @@ func GoType(msg Message) string {
 	return gobuf.String()
 }
 
-// GoTypeFuncs returns the generated code of Serialize, Deserialize, Len, and MessageType for the input msg
-func GoTypeFuncs(msg Message, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) string {
+// GoSerializers returns the generated code of Serialize, Len, and MessageType for the input msg
+func GoSerializers(msg Message, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) string {
 	gobuf := &bytes.Buffer{}
 	gobuf.WriteString(fmt.Sprintf("\n\nfunc (m %s) Serialize(buffer []byte) {\n", msg.Name))
 	if len(msg.Fields) > 0 {
@@ -101,14 +98,6 @@ func GoTypeFuncs(msg Message, messages []Message, messageMap map[string]Message,
 		WriteGoSerializeField(f, 1, gobuf, messageMap, enumMap)
 	}
 	gobuf.WriteString("}\n")
-	gobuf.WriteString(fmt.Sprintf("\nfunc %sDeserialize(buffer []byte) (m %s) {\n", msg.Name, msg.Name))
-	if len(msg.Fields) > 0 {
-		gobuf.WriteString("\tidx := 0\n")
-	}
-	for _, f := range msg.Fields {
-		WriteGoDeserialField(f, 1, gobuf, messageMap, enumMap)
-	}
-	gobuf.WriteString("\treturn m\n}\n")
 	gobuf.WriteString(fmt.Sprintf("\nfunc (m %s) Len() int {\n\tmylen := 0\n", msg.Name))
 	for _, f := range msg.Fields {
 		WriteGoLen(f, 1, gobuf, messageMap, enumMap)
@@ -123,28 +112,18 @@ func GoTypeFuncs(msg Message, messages []Message, messageMap map[string]Message,
 	return gobuf.String()
 }
 
-// WriteGo will create a new file and write all the types and functions
-func WriteGo(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) {
+// GoDeserializers returns the generated code of Deserialize
+func GoDeserializers(msg Message, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) string {
 	gobuf := &bytes.Buffer{}
-	gobuf.WriteString(GoLibHeader(pkgname, messages, messageMap, enums, enumMap))
-
-	for _, enum := range enums {
-		gobuf.WriteString("type ")
-		gobuf.WriteString(enum.Name)
-		gobuf.WriteString(" int\n\nconst(")
-		for _, ev := range enum.Values {
-			gobuf.WriteString(fmt.Sprintf("\n\t%s\t %s = %d", ev.Name, enum.Name, ev.Value))
-		}
-		gobuf.WriteString("\n)\n\n")
+	gobuf.WriteString(fmt.Sprintf("\nfunc %sDeserialize(buffer []byte) (m %s) {\n", msg.Name, msg.Name))
+	if len(msg.Fields) > 0 {
+		gobuf.WriteString("\tidx := 0\n")
 	}
-
-	// 2. Generate go classes
-	for _, msg := range messages {
-		gobuf.WriteString(GoType(msg))
-		gobuf.WriteString(GoTypeFuncs(msg, messages, messageMap, enums, enumMap))
+	for _, f := range msg.Fields {
+		WriteGoDeserialField(f, 1, gobuf, messageMap, enumMap)
 	}
-	os.MkdirAll(pkgname, 0777)
-	ioutil.WriteFile(path.Join(pkgname, pkgname+".go"), gobuf.Bytes(), 0666)
+	gobuf.WriteString("\treturn m\n}\n")
+	return gobuf.String()
 }
 
 func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[string]Message, enums map[string]Enum) {
