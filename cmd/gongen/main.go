@@ -183,14 +183,14 @@ func main() {
 					// }
 				}
 			case *ast.FuncDecl:
-				// skip
+				// skip, we don't care about functions
 			default:
 				fmt.Printf("Other declaration in file? %T, %#v\n", d, d)
 			}
 		}
 		// for _, imp := range f.Imports {
 		// 	fmt.Printf("import %#v\n", imp.Path.Value)
-		// 	// TODO: also create the imports serializers
+		// 	// TODO: also create the imports serializers?
 		// }
 	}
 	// 2. search public types for public fields with public types (std or public structs)

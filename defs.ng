@@ -2,9 +2,9 @@ package netmsg
 
 struct Multipart {
     ID  uint16
- GroupID uint32
- NumParts uint16
- Content []byte
+    GroupID uint32
+    NumParts uint16
+    Content []byte
 }
 
 struct Heartbeat {
@@ -23,6 +23,7 @@ struct ExampleDyn {
 
 struct SubNest {
  B int32
+ C float64
 }
 
 struct SubNest2 {
