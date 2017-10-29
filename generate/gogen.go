@@ -566,7 +566,7 @@ func writeDynDeserial(buf *bytes.Buffer, f MessageField, scopeDepth int) {
 	buf.WriteString(")\n")
 	writeTabScope(buf, scopeDepth)
 	//ParseNetMessage
-	buf.WriteString(fmt.Sprintf("p := ngen.Packet{Header: ngen.Header{MsgType: ngen.MessageType(%s)}}\n", mt))
+	buf.WriteString(fmt.Sprintf("p := ngen.Packet{Header: ngen.Header{MsgType: %s}}\n", mt))
 	writeTabScope(buf, scopeDepth)
 	if scopeDepth == 1 {
 		buf.WriteString("m.")

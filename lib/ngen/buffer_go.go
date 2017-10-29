@@ -11,9 +11,13 @@ func NewBuffer(b []byte) *Buffer {
 	return &Buffer{buf: b}
 }
 
+func (b *Buffer) Reset() {
+	b.loc = 0
+}
+
 // ReadByte will read next byte from buffer and increment read location
 func (b *Buffer) ReadByte() (byte, error) {
-	if len(b.buf) <= int(b.loc) {
+	if len(b.buf) < int(b.loc+1) {
 		return 0, io.EOF
 	}
 	v := b.buf[b.loc]
@@ -22,7 +26,7 @@ func (b *Buffer) ReadByte() (byte, error) {
 }
 
 func (b *Buffer) ReadUint16() (uint16, error) {
-	if len(b.buf) <= int(b.loc+2) {
+	if len(b.buf) < int(b.loc+2) {
 		return 0, io.EOF
 	}
 	v := Uint16(b.buf[b.loc:])
@@ -31,7 +35,7 @@ func (b *Buffer) ReadUint16() (uint16, error) {
 }
 
 func (b *Buffer) ReadInt16() (int16, error) {
-	if len(b.buf) <= int(b.loc+2) {
+	if len(b.buf) < int(b.loc+2) {
 		return 0, io.EOF
 	}
 	v := Uint16(b.buf[b.loc:])
@@ -40,7 +44,7 @@ func (b *Buffer) ReadInt16() (int16, error) {
 }
 
 func (b *Buffer) ReadUint32() (uint32, error) {
-	if len(b.buf) <= int(b.loc+4) {
+	if len(b.buf) < int(b.loc+4) {
 		return 0, io.EOF
 	}
 	v := Uint32(b.buf[b.loc:])
@@ -49,7 +53,7 @@ func (b *Buffer) ReadUint32() (uint32, error) {
 }
 
 func (b *Buffer) ReadInt32() (int32, error) {
-	if len(b.buf) <= int(b.loc+4) {
+	if len(b.buf) < int(b.loc+4) {
 		return 0, io.EOF
 	}
 	v := Uint32(b.buf[b.loc:])
@@ -68,7 +72,7 @@ func (b *Buffer) ReadInt() (int, error) {
 }
 
 func (b *Buffer) ReadUint64() (uint64, error) {
-	if len(b.buf) <= int(b.loc+8) {
+	if len(b.buf) < int(b.loc+8) {
 		return 0, io.EOF
 	}
 	v := Uint64(b.buf[b.loc:])
@@ -77,7 +81,7 @@ func (b *Buffer) ReadUint64() (uint64, error) {
 }
 
 func (b *Buffer) ReadInt64() (int64, error) {
-	if len(b.buf) <= int(b.loc+8) {
+	if len(b.buf) < int(b.loc+8) {
 		return 0, io.EOF
 	}
 	v := Uint64(b.buf[b.loc:])
@@ -86,7 +90,7 @@ func (b *Buffer) ReadInt64() (int64, error) {
 }
 
 func (b *Buffer) ReadFloat64() (float64, error) {
-	if len(b.buf) <= int(b.loc+8) {
+	if len(b.buf) < int(b.loc+8) {
 		return 0, io.EOF
 	}
 	v := Float64(b.buf[b.loc:])
@@ -109,6 +113,7 @@ func (b *Buffer) ReadByteSlice() ([]byte, error) {
 	}
 	v := make([]byte, l)
 	copy(v, b.buf[b.loc:b.loc+l])
+	b.loc += l
 	return v, nil
 }
 
