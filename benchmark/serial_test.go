@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/lologarithm/netgen/benchmark/netmsg"
+	"github.com/lologarithm/netgen/lib/ngen"
 )
 
 func generateNetGen() []*netmsg.Benchy {
@@ -38,22 +39,24 @@ func BenchmarkNetGenMarshal(b *testing.B) {
 	validate := ""
 	b.StopTimer()
 	data := generateNetGen()
-	ser := make([][]byte, len(data))
+	ser := make([]*ngen.Buffer, len(data))
 	for i, d := range data {
-		ser[i] = make([]byte, d.Len())
-		d.Serialize(ser[i])
+		buf := make([]byte, d.Len())
+		d.Serialize(buf)
+		ser[i] = ngen.NewBuffer(buf)
 	}
 	b.ReportAllocs()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		n := i % len(ser)
 		o := netmsg.BenchyDeserialize(ser[n])
+		ser[n].Reset()
 		// Validate unmarshalled data.
 		if validate != "" {
 			i := data[n]
 			correct := o.Name == i.Name && o.Phone == i.Phone && o.Siblings == i.Siblings && o.Spouse == i.Spouse && o.Money == i.Money && o.BirthDay == i.BirthDay
 			if !correct {
-				b.Fatalf("unmarshaled object differed:\n%v\n%v", i, o)
+				b.Fatalf("unmarshaled object differed:\n Expected: %v\n Found: %v", i, o)
 			}
 		}
 	}
