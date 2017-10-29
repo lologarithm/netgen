@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lologarithm/netgen/netmsg"
+	"github.com/lologarithm/netgen/benchmark/netmsg"
 )
 
 func generateNetGen() []*netmsg.Benchy {
