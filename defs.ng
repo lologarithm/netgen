@@ -8,13 +8,22 @@ struct Multipart {
 }
 
 struct Heartbeat {
- Time int64
- Latency int64
+    Time int64
+    Latency int64
+}
+
+struct Benchy {
+	Name     string
+	BirthDay int64
+	Phone    string
+	Siblings int32
+	Spouse   byte
+	Money    float64
 }
 
 struct Nested {
-  A SubNest
-  B *SubNest2
+    A SubNest
+    B *SubNest2
 }
 
 struct ExampleDyn {

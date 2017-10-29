@@ -35,6 +35,29 @@ func main() {
 		log.Printf("Failed to read definition file: %s", err)
 		return
 	}
+
+	pkgName, messages, enums, messageMap, enumMap := parseNG(data)
+	for _, l := range strings.Split(*genlist, ",") {
+		switch l {
+		case "go":
+			WriteGo(pkgName, messages, messageMap, enums, enumMap)
+		case "dart":
+			generate.WriteDartBindings(pkgName, messages, messageMap, enums, enumMap)
+			generate.WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
+		case "js":
+			generate.WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
+		case "cs":
+			// generate.WriteCS(messages, messageMap)
+		}
+	}
+}
+
+func parseNG(data []byte) (string, []generate.Message, []generate.Enum, map[string]generate.Message, map[string]generate.Enum) {
+	messages := []generate.Message{}
+	enums := []generate.Enum{}
+	messageMap := map[string]generate.Message{}
+	enumMap := map[string]generate.Enum{}
+
 	// Parse types
 	lines := strings.Split(string(data), "\n")
 	pkgName := "netgen"
@@ -87,15 +110,15 @@ func main() {
 					field.Pointer = true
 				}
 				switch field.Type {
-				case "byte":
+				case ByteType:
 					field.Size = 1
-				case "uint16", "int16":
+				case Uint16Type, Int16Type:
 					field.Size = 2
-				case "uint32", "int32":
+				case Uint32Type, Int32Type:
 					field.Size = 4
-				case "uint64", "int64", "float64":
+				case Uint64Type, Int64Type, Float64Type:
 					field.Size = 8
-				case "string":
+				case StringType:
 					field.Size = 4
 				}
 				message.SelfSize += field.Size
@@ -115,19 +138,8 @@ func main() {
 			}
 		}
 	}
-	for _, l := range strings.Split(*genlist, ",") {
-		switch l {
-		case "go":
-			WriteGo(pkgName, messages, messageMap, enums, enumMap)
-		case "dart":
-			generate.WriteDartBindings(pkgName, messages, messageMap, enums, enumMap)
-			generate.WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
-		case "js":
-			generate.WriteJSConverter(pkgName, messages, messageMap, enums, enumMap)
-		case "cs":
-			// generate.WriteCS(messages, messageMap)
-		}
-	}
+
+	return pkgName, messages, enums, messageMap, enumMap
 }
 
 // WriteGo will create a new file and write all the types and functions
@@ -154,3 +166,17 @@ func WriteGo(pkgname string, messages []generate.Message, messageMap map[string]
 	os.MkdirAll(pkgname, 0777)
 	ioutil.WriteFile(path.Join(pkgname, pkgname+".go"), gobuf.Bytes(), 0666)
 }
+
+// Supported type strings for netgen.
+const (
+	StringType  string = "string"
+	ByteType    string = "byte"
+	Int16Type   string = "int16"
+	Uint16Type  string = "uint16"
+	Int32Type   string = "int32"
+	Uint32Type  string = "uint32"
+	Int64Type   string = "int64"
+	Uint64Type  string = "uint64"
+	Float64Type string = "float64"
+	DynamicType string = "dynamic"
+)

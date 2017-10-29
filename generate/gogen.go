@@ -9,28 +9,11 @@ import (
 	"unicode/utf8"
 )
 
-// search messages to see if we have a float64 field.
-// this will help us decide if we need to import math package.
-func hasfloat64(messages []Message) bool {
-	for _, m := range messages {
-		for _, f := range m.Fields {
-			if f.Type == Float64Type {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // GoLibHeader will return all the bits needed to make the generated serializers/deserializers work
 // Specifically that is package name, imports, an enum of all message types, and a generic parse message function.
 func GoLibHeader(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) string {
 	gobuf := &bytes.Buffer{}
 	gobuf.WriteString(fmt.Sprintf("package %s\n\nimport (\n\t\"github.com/lologarithm/netgen/lib/ngen\"", pkgname))
-	if hasfloat64(messages) {
-		// only import math if we need to serial/deserial float64s
-		gobuf.WriteString("\n\t\"math\"")
-	}
 	gobuf.WriteString("\n)\n\n\n")
 	// 1. List type values!
 	gobuf.WriteString("const (\n\tUnknownMsgType ngen.MessageType = iota\n\tAckMsgType\n")

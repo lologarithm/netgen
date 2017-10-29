@@ -20,8 +20,39 @@ func TestEncode(t *testing.T) {
 	PutUint64(b, 4295032833)
 	v64 := Uint64(b)
 	if v64 != 4295032833 {
-		v64 := Uint64(b)
 		t.Logf("v64 value: %d\n", v64)
+		t.FailNow()
+	}
+}
+
+func TestEncodeMulti(t *testing.T) {
+	b := make([]byte, 2+4+8+4+8)
+	PutUint16(b, 1)
+	PutUint32(b[2:], 65537)
+	PutUint64(b[6:], 4295032833)
+	PutFloat64(b[14:], 123.456)
+	PutUint32(b[22:], 65536)
+	if Uint16(b[0:]) != 1 {
+		t.Logf("uint16 failed...")
+		t.FailNow()
+	}
+	if Uint32(b[2:]) != 65537 {
+		t.Logf("uint32 wrong")
+		t.FailNow()
+	}
+	if Uint64(b[6:]) != 4295032833 {
+		v64 := Uint64(b[6:])
+		t.Logf("v64 value: %d\n", v64)
+		t.FailNow()
+	}
+	if Float64(b[14:]) != 123.456 {
+		f64 := Float64(b[14:])
+		t.Logf("f64 value: %f\n", f64)
+		t.FailNow()
+	}
+	if Uint32(b[22:]) != 65536 {
+		u32 := Uint32(b[22:])
+		t.Logf("u32 value: %d\n", u32)
 		t.FailNow()
 	}
 }

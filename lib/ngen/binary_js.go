@@ -34,30 +34,34 @@ func PutUint32(b []byte, v uint32) {
 }
 
 func Uint64(b []byte) uint64 {
-	buf := js.InternalObject(b).Get("$array").Get("buffer")
-	view := js.Global.Get("Uint32Array").New(buf, 0, 2)
+	iba := js.InternalObject(b)
+	buf := iba.Get("$array").Get("buffer")
+	view := js.Global.Get("DataView").New(buf, iba.Get("$offset"), 8)
 	new64 := uint64(0)
-	js.InternalObject(new64).Set("$high", view.Index(1).Int())
-	js.InternalObject(new64).Set("$low", view.Index(0).Int())
+	js.InternalObject(new64).Set("$low", view.Call("getUint32", 0, true).Int())
+	js.InternalObject(new64).Set("$high", view.Call("getUint32", 4, true).Int())
 	return new64
 }
 
 func PutUint64(b []byte, v uint64) {
+	iba := js.InternalObject(b)
 	iv := js.InternalObject(v)
-	buf := js.InternalObject(b).Get("$array").Get("buffer")
-	view := js.Global.Get("Uint32Array").New(buf, 0, 2)
-	view.SetIndex(0, iv.Get("$low").Int())
-	view.SetIndex(1, iv.Get("$high").Int())
+	buf := iba.Get("$array").Get("buffer")
+	view := js.Global.Get("DataView").New(buf, iba.Get("$offset"), 8)
+	view.Call("setUint32", 0, iv.Get("$low").Int(), true)
+	view.Call("setUint32", 4, iv.Get("$high").Int(), true)
 }
 
 func Float64(b []byte) float64 {
-	buf := js.InternalObject(b).Get("$array").Get("buffer")
-	view := js.Global.Get("Float64Array").New(buf, 0, 1)
-	return view.Index(0).Float()
+	iba := js.InternalObject(b)
+	buf := iba.Get("$array").Get("buffer")
+	view := js.Global.Get("DataView").New(buf, iba.Get("$offset"), 8)
+	return view.Call("getFloat64", 0, true).Float()
 }
 
 func PutFloat64(b []byte, v float64) {
-	buf := js.InternalObject(b).Get("$array").Get("buffer")
-	view := js.Global.Get("Float64Array").New(buf, 0, 1)
-	view.SetIndex(0, v)
+	iba := js.InternalObject(b)
+	buf := iba.Get("$array").Get("buffer")
+	view := js.Global.Get("DataView").New(buf, iba.Get("$offset"), 8)
+	view.Call("setFloat64", 0, v, true)
 }
