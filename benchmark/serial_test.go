@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/lologarithm/netgen/benchmark/netmsg"
+	"github.com/lologarithm/netgen/lib/ngen"
 )
 
 func generateNetGen() []*netmsg.Benchy {
@@ -38,10 +39,11 @@ func BenchmarkNetGenMarshal(b *testing.B) {
 	validate := ""
 	b.StopTimer()
 	data := generateNetGen()
-	ser := make([][]byte, len(data))
+	ser := make([]*ngen.Buffer, len(data))
 	for i, d := range data {
-		ser[i] = make([]byte, d.Len())
-		d.Serialize(ser[i])
+		buf := make([]byte, d.Len())
+		d.Serialize(buf)
+		ser[i] = ngen.NewBuffer(buf)
 	}
 	b.ReportAllocs()
 	b.StartTimer()

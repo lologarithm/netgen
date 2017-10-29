@@ -19,7 +19,7 @@ const (
 )
 
 // ParseNetMessage accepts input of raw bytes from a NetMessage. Parses and returns a Net message.
-func ParseNetMessage(packet ngen.Packet, content []byte) ngen.Net {
+func ParseNetMessage(packet ngen.Packet, content *ngen.Buffer) ngen.Net {
 	switch packet.Header.MsgType {
 	case MultipartMsgType:
 		msg := MultipartDeserialize(content)
@@ -93,18 +93,11 @@ func (m Multipart) MsgType() ngen.MessageType {
 }
 
 
-func MultipartDeserialize(buffer []byte) (m Multipart) {
-	idx := 0
-	m.ID = ngen.Uint16(buffer[idx:])
-	idx+=2
-	m.GroupID = ngen.Uint32(buffer[idx:])
-	idx+=4
-	m.NumParts = ngen.Uint16(buffer[idx:])
-	idx+=2
-	l3_1 := int(ngen.Uint32(buffer[idx:]))
-	idx += 4
-	m.Content = make([]byte, l3_1)
-	copy(m.Content, buffer[idx:idx+l3_1])
+func MultipartDeserialize(buffer *ngen.Buffer) (m Multipart) {
+	m.ID, _ = buffer.ReadUint16()
+	m.GroupID, _ = buffer.ReadUint32()
+	m.NumParts, _ = buffer.ReadUint16()
+	m.Content, _ = buffer.ReadByteSlice()
 	return m
 }
 type Heartbeat struct {
@@ -132,12 +125,9 @@ func (m Heartbeat) MsgType() ngen.MessageType {
 }
 
 
-func HeartbeatDeserialize(buffer []byte) (m Heartbeat) {
-	idx := 0
-	m.Time = int64(ngen.Uint64(buffer[idx:]))
-	idx+=8
-	m.Latency = int64(ngen.Uint64(buffer[idx:]))
-	idx+=8
+func HeartbeatDeserialize(buffer *ngen.Buffer) (m Heartbeat) {
+	m.Time, _ = buffer.ReadInt64()
+	m.Latency, _ = buffer.ReadInt64()
 	return m
 }
 type Benchy struct {
@@ -185,25 +175,13 @@ func (m Benchy) MsgType() ngen.MessageType {
 }
 
 
-func BenchyDeserialize(buffer []byte) (m Benchy) {
-	idx := 0
-	l0_1 := int(ngen.Uint32(buffer[idx:]))
-	idx += 4
-	m.Name = string(buffer[idx:idx+l0_1])
-	idx+=len(m.Name)
-	m.BirthDay = int64(ngen.Uint64(buffer[idx:]))
-	idx+=8
-	l2_1 := int(ngen.Uint32(buffer[idx:]))
-	idx += 4
-	m.Phone = string(buffer[idx:idx+l2_1])
-	idx+=len(m.Phone)
-	m.Siblings = int32(ngen.Uint32(buffer[idx:]))
-	idx+=4
-	m.Spouse = buffer[idx]
-
-	idx+=1
-	m.Money = ngen.Float64(buffer[idx:])
-	idx+=8
+func BenchyDeserialize(buffer *ngen.Buffer) (m Benchy) {
+	m.Name, _ = buffer.ReadString()
+	m.BirthDay, _ = buffer.ReadInt64()
+	m.Phone, _ = buffer.ReadString()
+	m.Siblings, _ = buffer.ReadInt32()
+	m.Spouse, _ = buffer.ReadByte()
+	m.Money, _ = buffer.ReadFloat64()
 	return m
 }
 type Nested struct {
@@ -238,13 +216,10 @@ func (m Nested) MsgType() ngen.MessageType {
 }
 
 
-func NestedDeserialize(buffer []byte) (m Nested) {
-	idx := 0
-	m.A = SubNestDeserialize(buffer[idx:])
-	idx+=m.A.Len()
-	var subB = SubNest2Deserialize(buffer[idx:])
+func NestedDeserialize(buffer *ngen.Buffer) (m Nested) {
+	m.A = SubNestDeserialize(buffer)
+	var subB = SubNest2Deserialize(buffer)
 	m.B = &subB
-	idx+=m.B.Len()
 	return m
 }
 type ExampleDyn struct {
@@ -272,13 +247,11 @@ func (m ExampleDyn) MsgType() ngen.MessageType {
 }
 
 
-func ExampleDynDeserialize(buffer []byte) (m ExampleDyn) {
-	idx := 0
-	m.dynFieldType = ngen.MessageType(ngen.Uint16(buffer[idx:]))
-	idx+=2
-	p := ngen.Packet{Header: ngen.Header{MsgType: m.dynFieldType}}
-	m.DynField = ParseNetMessage(p, buffer[idx:])
-		idx+=m.DynField.(ngen.Net).Len()
+func ExampleDynDeserialize(buffer *ngen.Buffer) (m ExampleDyn) {
+	ttDynField, _ := buffer.ReadUint16()
+m.dynFieldType = ngen.MessageType(ttDynField)
+	p := ngen.Packet{Header: ngen.Header{MsgType: ngen.MessageType(m.dynFieldType)}}
+	m.DynField = ParseNetMessage(p, buffer)
 	return m
 }
 type SubNest struct {
@@ -306,12 +279,9 @@ func (m SubNest) MsgType() ngen.MessageType {
 }
 
 
-func SubNestDeserialize(buffer []byte) (m SubNest) {
-	idx := 0
-	m.B = int32(ngen.Uint32(buffer[idx:]))
-	idx+=4
-	m.C = ngen.Float64(buffer[idx:])
-	idx+=8
+func SubNestDeserialize(buffer *ngen.Buffer) (m SubNest) {
+	m.B, _ = buffer.ReadInt32()
+	m.C, _ = buffer.ReadFloat64()
 	return m
 }
 type SubNest2 struct {
@@ -330,7 +300,7 @@ func (m SubNest2) MsgType() ngen.MessageType {
 }
 
 
-func SubNest2Deserialize(buffer []byte) (m SubNest2) {
+func SubNest2Deserialize(buffer *ngen.Buffer) (m SubNest2) {
 	return m
 }
 type Connected struct {
@@ -354,9 +324,8 @@ func (m Connected) MsgType() ngen.MessageType {
 }
 
 
-func ConnectedDeserialize(buffer []byte) (m Connected) {
-	idx := 0
-	m.Awesomeness = Level(ngen.Uint32(buffer[idx:]))
-	idx+=4
+func ConnectedDeserialize(buffer *ngen.Buffer) (m Connected) {
+	tmpAwesomeness, _ := buffer.ReadUint32()
+	m.Awesomeness = Level(tmpAwesomeness)
 	return m
 }
