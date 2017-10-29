@@ -32,6 +32,7 @@ struct ExampleDyn {
 
 struct SubNest {
  B int32
+ C float64
 }
 
 struct SubNest2 {
