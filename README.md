@@ -1,5 +1,6 @@
 netgen
 --------------------
+![circleci status](https://circleci.com/gh/lologarithm/netgen.svg?&style=shield)
 
 netgen is a simple go serialization library (with the start of C# support).
 
