@@ -7,13 +7,6 @@ import (
 	"path"
 )
 
-// class Overflow {
-//   static const int none = 0;
-//   static const int partial = 1;
-//   static const int full = 2;
-//   static const int paginate = 3;
-// }
-
 func WriteDartBindings(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) {
 	gobuf := &bytes.Buffer{}
 	gobuf.WriteString(fmt.Sprintf("part of %s;\n", pkgname))
