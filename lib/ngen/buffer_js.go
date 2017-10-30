@@ -57,9 +57,9 @@ func (b *Buffer) ReadUint32() (uint32, error) {
 	if len(b.buf) < int(b.loc+4) {
 		return 0, io.EOF
 	}
-	v := Uint32(b.buf[b.loc:])
+	v := b.view.Call("getUint32", b.loc, true).Int()
 	b.loc += 4
-	return v, nil
+	return uint32(v), nil
 }
 
 func (b *Buffer) ReadInt32() (int32, error) {
