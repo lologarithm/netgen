@@ -1,6 +1,8 @@
 package ngen
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestEncode(t *testing.T) {
 	b := []byte{0, 0, 0, 0, 0, 0, 0, 0}
