@@ -6,6 +6,8 @@ netgen is a simple go serialization library (with the start of C# support).
 
 Optionally you can generate a copy of the go serializer designed to be run through gopherjs and automatically generate the dart object definitions to create js bindings with the converted code.
 
+binary is now located in cmd/netgen
+
 Usage
 -------------------
 You first create a netgen definition file (example in here 'defs.ng')
@@ -45,41 +47,17 @@ Supported field types are:
 - Pointers to Structs
   - Example "MyField *MyStruct"
 - Enums
-
-Usage
-----------------------
-First generate the message definitions
 ```
-netgen --input=mydefs.ng
+netgen --input=defs.ng --gen=go
 ```
 
-Now in code you could do this:
-```go
-packet, ok := netmsg.NextPacket(buffer) // buffer is assumed to have been read off socket
+Currently in development is a new (simpler hopefully) tool 'gongen' that generates all the same serialization code but it generates off a given go package instead of from a definition file. This allows you to use this tool with an existing code base without having to write an IDL.
 
-// You can now check the type
-switch msg := packet.NetMsg.(type) {
-case netmsg.MyRequest:
-    // Process the message!
-    ProcessMyMessage(msg)
-}
-
-// Now later you want to respond on the socket.
-
-// First create a packet with your message
-packet := netmsg.NewPacket(&netmsg.MyResponse{
-    AString: "a response message",
-    AValue: 100,
-})
-
-// To send the message simply pack the message into a byte buffer for sending!
-responseBuffer := packet.Pack()
+Use looks like
 ```
-
-By default all messages over the wire are decoded to message pointers.
-Fields on these messages could be pointers or structs.
-
-
+gongen --dir=./my/go/source --out=./my/go/serializers --gen=go
+```
+This isn't fully working yet but hopefully will be soon.
 
 Benchmarked using go-serialization-benchmark on a lenovo w540 laptop running ubuntu 16.04
 ```
