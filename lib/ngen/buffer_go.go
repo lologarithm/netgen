@@ -1,63 +1,65 @@
+// +build !js
+
 package ngen
 
 import "io"
 
 type Buffer struct {
-	buf []byte
-	loc uint32
+	Buf []byte
+	Loc uint32
 }
 
 func NewBuffer(b []byte) *Buffer {
-	return &Buffer{buf: b}
+	return &Buffer{Buf: b}
 }
 
 func (b *Buffer) Reset() {
-	b.loc = 0
+	b.Loc = 0
 }
 
 // ReadByte will read next byte from buffer and increment read location
 func (b *Buffer) ReadByte() (byte, error) {
-	if len(b.buf) < int(b.loc+1) {
+	if len(b.Buf) < int(b.Loc+1) {
 		return 0, io.EOF
 	}
-	v := b.buf[b.loc]
-	b.loc++
+	v := b.Buf[b.Loc]
+	b.Loc++
 	return v, nil
 }
 
 func (b *Buffer) ReadUint16() (uint16, error) {
-	if len(b.buf) < int(b.loc+2) {
+	if len(b.Buf) < int(b.Loc+2) {
 		return 0, io.EOF
 	}
-	v := Uint16(b.buf[b.loc:])
-	b.loc += 2
+	v := Uint16(b.Buf[b.Loc:])
+	b.Loc += 2
 	return v, nil
 }
 
 func (b *Buffer) ReadInt16() (int16, error) {
-	if len(b.buf) < int(b.loc+2) {
+	if len(b.Buf) < int(b.Loc+2) {
 		return 0, io.EOF
 	}
-	v := Uint16(b.buf[b.loc:])
-	b.loc += 2
+	v := Uint16(b.Buf[b.Loc:])
+	b.Loc += 2
 	return int16(v), nil
 }
 
 func (b *Buffer) ReadUint32() (uint32, error) {
-	if len(b.buf) < int(b.loc+4) {
+	if len(b.Buf) < int(b.Loc+4) {
 		return 0, io.EOF
 	}
-	v := Uint32(b.buf[b.loc:])
-	b.loc += 4
+	v := Uint32(b.Buf[b.Loc:])
+	b.Loc += 4
 	return v, nil
 }
 
 func (b *Buffer) ReadInt32() (int32, error) {
-	if len(b.buf) < int(b.loc+4) {
+	if len(b.Buf) < int(b.Loc+4) {
 		return 0, io.EOF
 	}
-	v := Uint32(b.buf[b.loc:])
-	b.loc += 4
+	v := Uint32(b.Buf[b.Loc:])
+	b.Loc += 4
 	return int32(v), nil
 }
 
@@ -72,35 +74,43 @@ func (b *Buffer) ReadInt() (int, error) {
 }
 
 func (b *Buffer) ReadUint64() (uint64, error) {
-	if len(b.buf) < int(b.loc+8) {
+	if len(b.Buf) < int(b.Loc+8) {
 		return 0, io.EOF
 	}
-	v := Uint64(b.buf[b.loc:])
-	b.loc += 8
+	v := Uint64(b.Buf[b.Loc:])
+	b.Loc += 8
 	return v, nil
 }
 
 func (b *Buffer) ReadInt64() (int64, error) {
-	if len(b.buf) < int(b.loc+8) {
+	if len(b.Buf) < int(b.Loc+8) {
 		return 0, io.EOF
 	}
-	v := Uint64(b.buf[b.loc:])
-	b.loc += 8
+	v := Uint64(b.Buf[b.Loc:])
+	b.Loc += 8
 	return int64(v), nil
 }
 
 func (b *Buffer) ReadFloat64() (float64, error) {
-	if len(b.buf) < int(b.loc+8) {
+	if len(b.Buf) < int(b.Loc+8) {
 		return 0, io.EOF
 	}
-	v := Float64(b.buf[b.loc:])
-	b.loc += 8
+	v := Float64(b.Buf[b.Loc:])
+	b.Loc += 8
 	return v, nil
 }
 
 func (b *Buffer) ReadString() (string, error) {
-	bs, err := b.ReadByteSlice()
-	return string(bs), err
+	l, err := b.ReadUint32()
+	if err != nil {
+		return "", err
+	}
+	if len(b.Buf) < int(b.Loc+l) {
+		return "", io.EOF
+	}
+	v := string(b.Buf[b.Loc : b.Loc+l])
+	b.Loc += l
+	return v, err
 }
 
 func (b *Buffer) ReadByteSlice() ([]byte, error) {
@@ -108,12 +118,12 @@ func (b *Buffer) ReadByteSlice() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(b.buf) < int(b.loc+l) {
+	if len(b.Buf) < int(b.Loc+l) {
 		return nil, io.EOF
 	}
 	v := make([]byte, l)
-	copy(v, b.buf[b.loc:b.loc+l])
-	b.loc += l
+	copy(v, b.Buf[b.Loc:b.Loc+l])
+	b.Loc += l
 	return v, nil
 }
 

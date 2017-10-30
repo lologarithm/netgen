@@ -24,7 +24,7 @@ func generateNetGen() []*netmsg.Benchy {
 	return a
 }
 
-func BenchmarkNetGenUnmarshal(b *testing.B) {
+func BenchmarkNetGenMarshal(b *testing.B) {
 	b.StopTimer()
 	data := generateNetGen()
 	b.ReportAllocs()
@@ -35,7 +35,7 @@ func BenchmarkNetGenUnmarshal(b *testing.B) {
 	}
 }
 
-func BenchmarkNetGenMarshal(b *testing.B) {
+func BenchmarkNetGenUnmarshal(b *testing.B) {
 	validate := ""
 	b.StopTimer()
 	data := generateNetGen()
