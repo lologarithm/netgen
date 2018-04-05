@@ -202,9 +202,9 @@ func main() {
 			if outdir == nil || *outdir == "" {
 				outdir = dir
 			}
-			outpkg := filepath.Base(*outdir)
+			// outpkg := filepath.Base(*outdir)
 			buf := &bytes.Buffer{}
-			buf.WriteString(generate.GoLibHeader(outpkg, messages, messageMap, enums, enumMap))
+			buf.WriteString(generate.GoLibHeader(pkgname, messages, messageMap, enums, enumMap))
 
 			for _, msg := range messages {
 				buf.WriteString(generate.GoDeserializers(msg, messages, messageMap, enums, enumMap))
@@ -213,7 +213,7 @@ func main() {
 			ioutil.WriteFile(filepath.Join(filepath.Join(wd, *outdir), "deserial.go"), buf.Bytes(), 0644)
 
 			buf.Reset()
-			buf.WriteString(fmt.Sprintf("package %s\n\nimport \"github.com/lologarithm/netgen/lib/ngenframe\"", pkgname))
+			buf.WriteString(fmt.Sprintf("package %s\n\nimport \"github.com/lologarithm/netgen/lib/ngen\"", pkgname))
 			for _, msg := range messages {
 				buf.WriteString(generate.GoSerializers(msg, messages, messageMap, enums, enumMap))
 			}
