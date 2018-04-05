@@ -5,14 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lologarithm/netgen/benchmark/netmsg"
 	"github.com/lologarithm/netgen/lib/ngen"
 )
 
-func generateNetGen() []*netmsg.Benchy {
-	a := make([]*netmsg.Benchy, 0, 1000)
+func generateNetGen() []*Benchy {
+	a := make([]*Benchy, 0, 1000)
 	for i := 0; i < 1000; i++ {
-		a = append(a, &netmsg.Benchy{
+		a = append(a, &Benchy{
 			Name:     "asdfasdfasdfasdf",
 			BirthDay: time.Now().UnixNano(),
 			Phone:    "123-456-7890",
@@ -49,7 +48,7 @@ func BenchmarkNetGenUnmarshal(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		n := i % len(ser)
-		o := netmsg.BenchyDeserialize(ser[n])
+		o := BenchyDeserialize(ser[n])
 		ser[n].Reset()
 		// Validate unmarshalled data.
 		if validate != "" {

@@ -1,11 +1,7 @@
 package main
 
-import (
-	"github.com/lologarithm/netgen/benchmark/netmsg"
-)
-
 func main() {
-	m := &netmsg.Benchy{
+	m := &Benchy{
 		Name:     "asdfasdfasdfasdf",
 		BirthDay: 1234567801,
 		Phone:    "123-456-7890",
@@ -15,4 +11,13 @@ func main() {
 	}
 	print(m)
 	// stub so gopherjs stops whining
+}
+
+type Benchy struct {
+	Name     string
+	BirthDay int64
+	Phone    string
+	Siblings int32
+	Spouse   byte
+	Money    float64
 }
