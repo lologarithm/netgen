@@ -24,6 +24,11 @@ type Benchy struct {
 	Money    float64
 }
 
+type FeaturesOne struct {
+	Dynd *FeaturesOne
+	V    int
+}
+
 type Features struct {
 	Dynd          MyInterface
 	Bin           []byte
@@ -32,7 +37,7 @@ type Features struct {
 	EnumyV        Enumy
 }
 
-type Enumy int
+type Enumy int32
 
 const (
 	A Enumy = iota

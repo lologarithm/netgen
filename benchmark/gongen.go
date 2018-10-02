@@ -37,10 +37,49 @@ func (m Benchy) MsgType() ngen.MessageType {
 	return BenchyMsgType
 }
 
+func (m FeaturesOne) Serialize(buffer []byte) {
+	idx := 0
+	if m.Dynd != nil {
+		buffer[idx] = 1
+		idx++
+		m.Dynd.Serialize(buffer[idx:])
+		idx += m.Dynd.Len()
+	} else {
+		buffer[idx] = 0
+		idx++
+	}
+	ngen.PutUint32(buffer[idx:], uint32(m.V))
+	idx += 4
+}
+
+func (m FeaturesOne) Len() int {
+	mylen := 0
+
+	mylen++ // nil check
+	if m.Dynd != nil {
+		mylen += m.Dynd.Len()
+	}
+	mylen += 4
+	return mylen
+}
+
+func (m FeaturesOne) MsgType() ngen.MessageType {
+	return FeaturesOneMsgType
+}
+
 func (m Features) Serialize(buffer []byte) {
 	idx := 0
-	m.Dynd.Serialize(buffer[idx:])
-	idx += m.Dynd.Len()
+	if m.Dynd != nil {
+		buffer[idx] = 1
+		idx++
+		ngen.PutUint16(buffer[idx:], uint16(m.Dynd.MsgType()))
+		idx += 2
+		m.Dynd.Serialize(buffer[idx:])
+		idx += m.Dynd.Len()
+	} else {
+		buffer[idx] = 0
+		idx++
+	}
 	ngen.PutUint32(buffer[idx:], uint32(len(m.Bin)))
 	idx += 4
 	copy(buffer[idx:], m.Bin)
@@ -67,15 +106,22 @@ func (m Features) Serialize(buffer []byte) {
 func (m Features) Len() int {
 	mylen := 0
 
+	mylen++ // nil check
+	if m.Dynd != nil {
+		mylen += 2 // interface type value
+		mylen += m.Dynd.Len()
+	}
 	mylen += 4 + len(m.Bin)
 	mylen += 4
 	for _, v2 := range m.OtherFeatures {
-		_ = v2
-		mylen += v2.Len()
-		mylen++
+
+		mylen++ // nil check
+		if v2 != nil {
+			mylen += v2.Len()
+		}
 	}
 	mylen += m.DatBenchy.Len()
-	mylen += 4
+	mylen += 4 // enums are always int32... for now
 	return mylen
 }
 

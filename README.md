@@ -26,7 +26,7 @@ Supported field types are:
 - Structs
 - Pointers to Structs
   - Example "MyField *MyStruct"
-- Enums
+- Enums (always serializes as int32 currently)
 - Interfaces (as long as the interface also implements ngen.Net and the underlying struct is defined in the same package)
 
 Use looks like
