@@ -21,3 +21,27 @@ type Benchy struct {
 	Spouse   byte
 	Money    float64
 }
+
+type Features struct {
+	Dynd          MyInterface
+	Bin           []byte
+	OtherFeatures []*Features
+	DatBenchy     Benchy
+	EnumyV        Enumy
+}
+
+type Enumy int
+
+const (
+	A Enumy = iota
+	B
+	C
+)
+
+func (f *Features) Stuff() {
+	// and things
+}
+
+type MyInterface interface {
+	Stuff()
+}

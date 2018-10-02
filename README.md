@@ -2,35 +2,15 @@ netgen
 --------------------
 ![circleci status](https://circleci.com/gh/lologarithm/netgen.svg?&style=shield)
 
-netgen is a simple go serialization library (with the start of C# support).
+netgen is a simple go serialization library
 
-Optionally you can generate a copy of the go serializer designed to be run through gopherjs and automatically generate the dart object definitions to create js bindings with the converted code.
+Optionally you can generate a copy of the go serializer designed to be run through gopherjs.
+C# generator is in progress but has fallen behind with some of the new features and doesn't work at this point.
 
 binary is now located in cmd/netgen
 
 Usage
 -------------------
-You first create a netgen definition file (example in here 'defs.ng')
-
-Example
-```
-package example
-
-struct Heartbeat {
-    Time int64
-    Latency int64
-}
-
-struct Connected {
-    Awesomeness Level
-}
-
-enum Level {
-    PrettyLow = 0
-    PrettyOk = 1
-    PrettyAwesome = 2
-}
-```
 Package declaration defines the package name of the output (which for now just outputs into the current directory)
 
 Supported field types are:
@@ -47,17 +27,14 @@ Supported field types are:
 - Pointers to Structs
   - Example "MyField *MyStruct"
 - Enums
-```
-netgen --input=defs.ng --gen=go
-```
 
-Currently in development is a new (simpler hopefully) tool 'gongen' that generates all the same serialization code but it generates off a given go package instead of from a definition file. This allows you to use this tool with an existing code base without having to write an IDL.
 
 Use looks like
 ```
-gongen --dir=./my/go/source --out=./my/go/serializers --gen=go
+netgen --dir=./my/go/sourcedir --out=./my/go/serializersdir --gen=go
 ```
-This isn't fully working yet but hopefully will be soon.
+
+`out` defaults to the input package
 
 Benchmarked using go-serialization-benchmark on a lenovo w540 laptop running ubuntu 16.04
 ```
