@@ -1,5 +1,7 @@
 package main
 
+import "github.com/lologarithm/netgen/lib/ngen"
+
 func main() {
 	m := &Benchy{
 		Name:     "asdfasdfasdfasdf",
@@ -20,4 +22,29 @@ type Benchy struct {
 	Siblings int32
 	Spouse   byte
 	Money    float64
+}
+
+type Features struct {
+	Dynd          MyInterface
+	Bin           []byte
+	OtherFeatures []*Features
+	DatBenchy     Benchy
+	EnumyV        Enumy
+}
+
+type Enumy int
+
+const (
+	A Enumy = iota
+	B
+	C
+)
+
+func (f *Features) Stuff() {
+	// and things
+}
+
+type MyInterface interface {
+	ngen.Net
+	Stuff()
 }
