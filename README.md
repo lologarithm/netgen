@@ -27,7 +27,7 @@ Supported field types are:
 - Pointers to Structs
   - Example "MyField *MyStruct"
 - Enums
-
+- Interfaces (as long as the interface also implements ngen.Net and the underlying struct is defined in the same package)
 
 Use looks like
 ```
@@ -37,6 +37,8 @@ netgen --dir=./my/go/sourcedir --out=./my/go/serializersdir --gen=go
 `out` defaults to the input package
 
 See the benchmark package for some example generated code.
+
+Currently this generates serialization code for a single package at a time. Imported types will not work.
 
 Benchmarked using go-serialization-benchmark on a lenovo w540 laptop running ubuntu 16.04
 ```
