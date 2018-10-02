@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -20,7 +19,6 @@ func TestFeaturesOne(t *testing.T) {
 
 	buff := make([]byte, ft.Len())
 	ft.Serialize(buff)
-	fmt.Printf("buff: %v\n", buff)
 	newft := FeaturesOneDeserialize(ngen.NewBuffer(buff))
 	if newft.Dynd.V != 1 {
 		t.FailNow()
@@ -37,7 +35,7 @@ func TestFeatures(t *testing.T) {
 
 	buff := make([]byte, ft.Len())
 	ft.Serialize(buff)
-	fmt.Printf("buff: %v", buff)
+
 	newft := FeaturesDeserialize(ngen.NewBuffer(buff))
 
 	if len(ft.Bin) != len(newft.Bin) {
@@ -48,8 +46,6 @@ func TestFeatures(t *testing.T) {
 			t.Fatalf("Binary blob doesn't match: %v vs %v", ft.Bin, newft.Bin)
 		}
 	}
-
-	fmt.Printf("\nnewft: %d\n", newft.EnumyV)
 	if newft.EnumyV != 10 {
 		t.FailNow()
 	}
