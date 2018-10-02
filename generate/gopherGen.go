@@ -94,7 +94,12 @@ func WriteJSConvertField(buf *bytes.Buffer, pkgname string, f MessageField, subi
 		buf.WriteString("\n\t}")
 	} else if _, ok := msgMap[f.Type]; ok {
 		// We have another message type
-		if f.Pointer {
+		if f.Interface {
+			getnametype := fmt.Sprintf("Get(\"%sType\")", f.Name)
+			buf.WriteString(fmt.Sprintf("ParseNetMessageJS(jso.%s, %s.MessageType(jso.%s.Int()))", getname, pkgname, getnametype))
+			// TODO: Finish gopherjs interface code
+
+		} else if f.Pointer {
 			subName := "sub" + f.Name
 			if subindex != "" {
 				subName = "subi"
@@ -116,9 +121,6 @@ func WriteJSConvertField(buf *bytes.Buffer, pkgname string, f MessageField, subi
 			buf.WriteString(fmt.Sprintf("%s(jso.%s.Uint64())", f.Type, getname))
 		case StringType:
 			buf.WriteString(fmt.Sprintf("jso.%s.String()", getname))
-		case DynamicType:
-			getnametype := fmt.Sprintf("Get(\"%sType\")", f.Name)
-			buf.WriteString(fmt.Sprintf("ParseNetMessageJS(jso.%s, %s.MessageType(jso.%s.Int()))", getname, pkgname, getnametype))
 		default:
 			panic("Unknown type: " + f.Type)
 		}

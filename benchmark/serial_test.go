@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -8,6 +9,55 @@ import (
 	"github.com/lologarithm/netgen/lib/ngen"
 )
 
+func TestFeaturesOne(t *testing.T) {
+	ft := FeaturesOne{
+		Dynd: &FeaturesOne{V: 1},
+		V:    2,
+		// Bin:           []byte{1, 2, 3},
+		// OtherFeatures: []*Features{{EnumyV: 11}},
+		// EnumyV:        Enumy(10),
+	}
+
+	buff := make([]byte, ft.Len())
+	ft.Serialize(buff)
+	fmt.Printf("buff: %v\n", buff)
+	newft := FeaturesOneDeserialize(ngen.NewBuffer(buff))
+	if newft.Dynd.V != 1 {
+		t.FailNow()
+	}
+}
+
+func TestFeatures(t *testing.T) {
+	ft := Features{
+		Dynd:          &Features{},
+		Bin:           []byte{1, 2, 3},
+		OtherFeatures: []*Features{{EnumyV: 11}},
+		EnumyV:        Enumy(10),
+	}
+
+	buff := make([]byte, ft.Len())
+	ft.Serialize(buff)
+	fmt.Printf("buff: %v", buff)
+	newft := FeaturesDeserialize(ngen.NewBuffer(buff))
+
+	if len(ft.Bin) != len(newft.Bin) {
+		t.Fatalf("Binary blob len doesn't match: %v vs %v", ft.Bin, newft.Bin)
+	}
+	for i, v := range ft.Bin {
+		if newft.Bin[i] != v {
+			t.Fatalf("Binary blob doesn't match: %v vs %v", ft.Bin, newft.Bin)
+		}
+	}
+
+	fmt.Printf("\nnewft: %d\n", newft.EnumyV)
+	if newft.EnumyV != 10 {
+		t.FailNow()
+	}
+
+	if newft.OtherFeatures[0].EnumyV != 11 {
+		t.FailNow()
+	}
+}
 func generateNetGen() []*Benchy {
 	a := make([]*Benchy, 0, 1000)
 	for i := 0; i < 1000; i++ {

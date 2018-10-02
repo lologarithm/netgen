@@ -45,5 +45,4 @@ const (
 	Int64Type   string = "int64"
 	Uint64Type  string = "uint64"
 	Float64Type string = "float64"
-	DynamicType string = "dynamic"
 )
