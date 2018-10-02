@@ -36,6 +36,8 @@ netgen --dir=./my/go/sourcedir --out=./my/go/serializersdir --gen=go
 
 `out` defaults to the input package
 
+See the benchmark package for some example generated code.
+
 Benchmarked using go-serialization-benchmark on a lenovo w540 laptop running ubuntu 16.04
 ```
 go version go1.7.1 linux/amd64

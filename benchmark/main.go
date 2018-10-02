@@ -1,5 +1,7 @@
 package main
 
+import "github.com/lologarithm/netgen/lib/ngen"
+
 func main() {
 	m := &Benchy{
 		Name:     "asdfasdfasdfasdf",
@@ -43,5 +45,6 @@ func (f *Features) Stuff() {
 }
 
 type MyInterface interface {
+	ngen.Net
 	Stuff()
 }

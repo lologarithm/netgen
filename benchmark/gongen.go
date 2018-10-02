@@ -37,3 +37,50 @@ func (m Benchy) MsgType() ngen.MessageType {
 	return BenchyMsgType
 }
 
+
+
+func (m Features) Serialize(buffer []byte) {
+	idx := 0
+	m.Dynd.Serialize(buffer[idx:])
+	idx+=m.Dynd.Len()
+	ngen.PutUint32(buffer[idx:], uint32(len(m.Bin)))
+	idx += 4
+	copy(buffer[idx:], m.Bin)
+	idx+=len(m.Bin)
+	ngen.PutUint32(buffer[idx:], uint32(len(m.OtherFeatures)))
+	idx += 4
+	for _, v2 := range m.OtherFeatures {
+		if v2 != nil {
+				buffer[idx] = 1
+				idx++
+				v2.Serialize(buffer[idx:])
+		idx+=v2.Len()
+		} else {
+		buffer[idx] = 0
+		idx++
+		}	}
+	m.DatBenchy.Serialize(buffer[idx:])
+	idx+=m.DatBenchy.Len()
+		ngen.PutUint32(buffer[idx:], uint32(m.EnumyV))
+	idx+=4
+}
+
+func (m Features) Len() int {
+	mylen := 0
+	
+	mylen += 4 + len(m.Bin)
+	mylen += 4
+	for _, v2 := range m.OtherFeatures {
+	_ = v2
+		mylen += v2.Len()		
+mylen++
+	}
+	mylen += m.DatBenchy.Len()
+	mylen += 4
+	return mylen
+}
+
+func (m Features) MsgType() ngen.MessageType {
+	return FeaturesMsgType
+}
+
