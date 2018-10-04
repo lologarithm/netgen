@@ -9,6 +9,7 @@ import (
 	"go/token"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -204,12 +205,13 @@ func main() {
 	// 2. search public types for public fields with public types (std or public structs)
 	// 3. build up types required
 
+	if outdir == nil || *outdir == "" {
+		outdir = dir
+	}
+
 	for _, l := range strings.Split(*genlist, ",") {
 		switch l {
 		case "go":
-			if outdir == nil || *outdir == "" {
-				outdir = dir
-			}
 			// outpkg := filepath.Base(*outdir)
 			buf := &bytes.Buffer{}
 			buf.WriteString(generate.GoLibHeader(pkgname, messages, messageMap, enums, enumMap))
@@ -221,13 +223,16 @@ func main() {
 			ioutil.WriteFile(filepath.Join(filepath.Join(wd, *outdir), "deserial.go"), buf.Bytes(), 0644)
 
 			buf.Reset()
-			buf.WriteString(fmt.Sprintf("package %s\n\nimport \"github.com/lologarithm/netgen/lib/ngen\"", pkgname))
+			buf.WriteString(fmt.Sprintf("%spackage %s\n\nimport \"github.com/lologarithm/netgen/lib/ngen\"", generate.HeaderComment(), pkgname))
 			for _, msg := range messages {
 				buf.WriteString(generate.GoSerializers(msg, messages, messageMap, enums, enumMap))
 			}
 			ioutil.WriteFile(filepath.Join(pkgpath, "gongen.go"), buf.Bytes(), 0644)
 		case "js":
-			generate.WriteJSConverter(pkgname, messages, messageMap, enums, enumMap)
+			jsfile := generate.WriteJSConverter(pkgname, messages, messageMap, enums, enumMap)
+			rootpkg := filepath.Join(wd, *outdir)
+			ioutil.WriteFile(path.Join(rootpkg, "jsSerial.go"), jsfile, 0666)
+
 		case "cs":
 			// generate.WriteCS(messages, messageMap)
 		}

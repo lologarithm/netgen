@@ -54,7 +54,7 @@ func ParseHeader(rawBytes []byte) (mf Header, ok bool) {
 	return mf, true
 }
 
-type NetParser func(Packet, []byte) Net
+type NetParser func(Packet, *Buffer) Net
 
 func NextPacket(rawBytes []byte, parser NetParser) (packet Packet, ok bool) {
 	packet.Header, ok = ParseHeader(rawBytes)
@@ -64,7 +64,7 @@ func NextPacket(rawBytes []byte, parser NetParser) (packet Packet, ok bool) {
 
 	ok = false
 	if packet.Len() <= len(rawBytes) {
-		packet.NetMsg = parser(packet, rawBytes[HeaderLen:packet.Len()])
+		packet.NetMsg = parser(packet, NewBuffer(rawBytes[HeaderLen:packet.Len()]))
 		if packet.NetMsg != nil {
 			ok = true
 		}
