@@ -1,15 +1,14 @@
-package modelsjs
+package models
 
 import (
 	"github.com/gopherjs/gopherjs/js"
-	"github.com/lologarithm/netgen/example/models"
 	"github.com/lologarithm/netgen/lib/ngen"
 )
 
 // ParseNetMessageJS accepts input of js.Object, parses it and returns a Net message.
 func ParseNetMessageJS(jso *js.Object, t ngen.MessageType) ngen.Net {
 	switch t {
-	case models.MessageMsgType:
+	case MessageMsgType:
 		msg := MessageFromJS(jso)
 		return &msg
 	default:
@@ -17,7 +16,7 @@ func ParseNetMessageJS(jso *js.Object, t ngen.MessageType) ngen.Net {
 	}
 }
 
-func MessageFromJS(jso *js.Object) (m models.Message) {
+func MessageFromJS(jso *js.Object) (m Message) {
 	m.Message = jso.Get("Message").String()
 	return m
 }

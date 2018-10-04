@@ -37,16 +37,18 @@ func (m Benchy) MsgType() ngen.MessageType {
 	return BenchyMsgType
 }
 
+
+
 func (m FeaturesOne) Serialize(buffer []byte) {
 	idx := 0
 	if m.Dynd != nil {
 		buffer[idx] = 1
 		idx++
 		m.Dynd.Serialize(buffer[idx:])
-		idx += m.Dynd.Len()
+	idx += m.Dynd.Len()
 	} else {
-		buffer[idx] = 0
-		idx++
+	buffer[idx] = 0
+	idx++
 	}
 	ngen.PutUint32(buffer[idx:], uint32(m.V))
 	idx += 4
@@ -54,10 +56,10 @@ func (m FeaturesOne) Serialize(buffer []byte) {
 
 func (m FeaturesOne) Len() int {
 	mylen := 0
-
-	mylen++ // nil check
+	
+	mylen++ // nil check 
 	if m.Dynd != nil {
-		mylen += m.Dynd.Len()
+	mylen += m.Dynd.Len()
 	}
 	mylen += 4
 	return mylen
@@ -67,18 +69,20 @@ func (m FeaturesOne) MsgType() ngen.MessageType {
 	return FeaturesOneMsgType
 }
 
+
+
 func (m Features) Serialize(buffer []byte) {
 	idx := 0
 	if m.Dynd != nil {
 		buffer[idx] = 1
 		idx++
-		ngen.PutUint16(buffer[idx:], uint16(m.Dynd.MsgType()))
-		idx += 2
+			ngen.PutUint16(buffer[idx:], uint16(m.Dynd.MsgType()))
+	idx += 2
 		m.Dynd.Serialize(buffer[idx:])
-		idx += m.Dynd.Len()
+	idx += m.Dynd.Len()
 	} else {
-		buffer[idx] = 0
-		idx++
+	buffer[idx] = 0
+	idx++
 	}
 	ngen.PutUint32(buffer[idx:], uint32(len(m.Bin)))
 	idx += 4
@@ -88,36 +92,36 @@ func (m Features) Serialize(buffer []byte) {
 	idx += 4
 	for _, v2 := range m.OtherFeatures {
 		if v2 != nil {
-			buffer[idx] = 1
-			idx++
-			v2.Serialize(buffer[idx:])
-			idx += v2.Len()
+				buffer[idx] = 1
+				idx++
+				v2.Serialize(buffer[idx:])
+		idx += v2.Len()
 		} else {
-			buffer[idx] = 0
-			idx++
+		buffer[idx] = 0
+		idx++
 		}
 	}
 	m.DatBenchy.Serialize(buffer[idx:])
 	idx += m.DatBenchy.Len()
-	ngen.PutUint32(buffer[idx:], uint32(m.EnumyV))
+		ngen.PutUint32(buffer[idx:], uint32(m.EnumyV))
 	idx += 4
 }
 
 func (m Features) Len() int {
 	mylen := 0
-
-	mylen++ // nil check
+	
+	mylen++ // nil check 
 	if m.Dynd != nil {
-		mylen += 2 // interface type value
-		mylen += m.Dynd.Len()
+	mylen+=2 // interface type value
+	mylen += m.Dynd.Len()
 	}
 	mylen += 4 + len(m.Bin)
 	mylen += 4
 	for _, v2 := range m.OtherFeatures {
-
-		mylen++ // nil check
+		
+		mylen++ // nil check 
 		if v2 != nil {
-			mylen += v2.Len()
+		mylen += v2.Len()
 		}
 	}
 	mylen += m.DatBenchy.Len()
@@ -128,3 +132,4 @@ func (m Features) Len() int {
 func (m Features) MsgType() ngen.MessageType {
 	return FeaturesMsgType
 }
+

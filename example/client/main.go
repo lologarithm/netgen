@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/gopherjs/gopherjs/js"
 	"github.com/lologarithm/netgen/example/models"
-	"github.com/lologarithm/netgen/example/models/modelsjs"
 	"github.com/lologarithm/netgen/lib/ngen"
 	"github.com/lologarithm/netgen/lib/ngen/client"
 	"github.com/lologarithm/netgen/lib/ngen/client/ngwebsocket"
@@ -33,7 +32,7 @@ type ClientJS struct {
 // }
 
 func (c *ClientJS) SendMessage(jso *js.Object) {
-	c.Outgoing <- ngen.NewPacket(modelsjs.MessageFromJS(jso))
+	c.Outgoing <- ngen.NewPacket(models.MessageFromJS(jso))
 }
 
 func (c *ClientJS) Dial(url string) {
