@@ -6,7 +6,7 @@ type Net interface {
 	MsgType() MessageType
 }
 
-const HeaderLen int = 6
+const HeaderLen int = 8
 
 func NewPacket(msg Net) *Packet {
 	return &Packet{
@@ -26,10 +26,10 @@ type Packet struct {
 // Pack serializes the content into RawBytes.
 func (p *Packet) Pack() []byte {
 	buf := make([]byte, p.Len())
-	PutUint16(buf, uint16(p.Header.MsgType))
-	PutUint16(buf[2:], p.Header.Seq)
-	PutUint16(buf[4:], p.Header.ContentLength)
-	p.NetMsg.Serialize(buf[6:])
+	PutUint32(buf, uint32(p.Header.MsgType))
+	PutUint16(buf[4:], p.Header.Seq)
+	PutUint16(buf[6:], p.Header.ContentLength)
+	p.NetMsg.Serialize(buf[8:])
 	return buf
 }
 
@@ -39,18 +39,18 @@ func (p *Packet) Len() int {
 }
 
 type Header struct {
-	MsgType       MessageType // byte 0-1, type
-	Seq           uint16      // byte 2-3, order of message
-	ContentLength uint16      // byte 4-5, content length
+	MsgType       MessageType // byte 0-3, type
+	Seq           uint16      // byte 4-5, order of message
+	ContentLength uint16      // byte 6-7, content length
 }
 
 func ParseHeader(rawBytes []byte) (mf Header, ok bool) {
 	if len(rawBytes) < HeaderLen {
 		return
 	}
-	mf.MsgType = MessageType(Uint16(rawBytes[0:2]))
-	mf.Seq = Uint16(rawBytes[2:4])
-	mf.ContentLength = Uint16(rawBytes[4:6])
+	mf.MsgType = MessageType(Uint32(rawBytes[0:4]))
+	mf.Seq = Uint16(rawBytes[4:6])
+	mf.ContentLength = Uint16(rawBytes[6:8])
 	return mf, true
 }
 
@@ -72,4 +72,4 @@ func NextPacket(rawBytes []byte, parser NetParser) (packet Packet, ok bool) {
 	return
 }
 
-type MessageType uint16
+type MessageType uint32

@@ -147,7 +147,7 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 				buf.WriteString(fmt.Sprintf("if %s != nil {\n", n))
 				writeTabScope(buf, scopeDepth)
 				if f.Interface {
-					buf.WriteString("mylen+=2 // interface type value\n")
+					buf.WriteString("mylen+=4 // interface type value\n")
 					writeTabScope(buf, scopeDepth)
 				}
 			}
@@ -302,9 +302,9 @@ func WriteGoSerializeField(f MessageField, scopeDepth int, buf *bytes.Buffer, me
 				buf.WriteString(fmt.Sprintf("if %s != nil {\n", varname))
 				buf.WriteString(fmt.Sprintf("%s%sbuffer[idx] = 1\n%s%sidx++\n%s", tabString, tabString, tabString, tabString, tabString))
 				if f.Interface {
-					buf.WriteString(fmt.Sprintf("%s\tngen.PutUint16(buffer[idx:], uint16(%s.MsgType()))\n", tabString, varname))
+					buf.WriteString(fmt.Sprintf("%s\tngen.PutUint32(buffer[idx:], uint32(%s.MsgType()))\n", tabString, varname))
 					writeTabScope(buf, scopeDepth)
-					buf.WriteString("idx += 2\n")
+					buf.WriteString("idx += 4\n")
 					writeTabScope(buf, scopeDepth)
 				}
 				buf.WriteString(fmt.Sprintf("%s%s.Serialize(buffer[idx:])\n%sidx += %s.Len()\n%s", tabString, varname, tabString, varname, tabString))
@@ -454,7 +454,7 @@ func writeInterDeserial(buf *bytes.Buffer, f MessageField, scopeDepth int) {
 	writeTabScope(buf, scopeDepth)
 	mt := fmt.Sprintf("\tiType%d", f.Order)
 	buf.WriteString(mt)
-	buf.WriteString(", _ := buffer.ReadUint16()\n\t")
+	buf.WriteString(", _ := buffer.ReadUint32()\n\t")
 
 	//ParseNetMessage
 	buf.WriteString(fmt.Sprintf("\tp := ngen.Packet{Header: ngen.Header{MsgType: ngen.MessageType(%s)}}\n", mt))
