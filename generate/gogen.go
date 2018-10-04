@@ -181,7 +181,7 @@ func writeIdxInc(f MessageField, scopeDepth int, buf *bytes.Buffer) {
 
 	buf.WriteString("\n")
 	writeTabScope(buf, scopeDepth)
-	buf.WriteString("idx+=")
+	buf.WriteString("idx += ")
 	switch f.Type {
 	case ByteType, BoolType:
 		if f.Array {
@@ -298,15 +298,15 @@ func WriteGoSerializeField(f MessageField, scopeDepth int, buf *bytes.Buffer, me
 				if f.Interface {
 					buf.WriteString(fmt.Sprintf("%s\tngen.PutUint16(buffer[idx:], uint16(%s.MsgType()))\n", tabString, varname))
 					writeTabScope(buf, scopeDepth)
-					buf.WriteString("idx+=2\n")
+					buf.WriteString("idx += 2\n")
 					writeTabScope(buf, scopeDepth)
 				}
-				buf.WriteString(fmt.Sprintf("%s%s.Serialize(buffer[idx:])\n%sidx+=%s.Len()\n%s", tabString, varname, tabString, varname, tabString))
+				buf.WriteString(fmt.Sprintf("%s%s.Serialize(buffer[idx:])\n%sidx += %s.Len()\n%s", tabString, varname, tabString, varname, tabString))
 				buf.WriteString("} else {\n")
 				buf.WriteString(fmt.Sprintf("%sbuffer[idx] = 0\n%sidx++\n%s", tabString, tabString, tabString))
 				buf.WriteString("}\n")
 			} else {
-				buf.WriteString(fmt.Sprintf("%s.Serialize(buffer[idx:])\n%sidx+=%s.Len()\n%s", varname, tabString, varname, tabString))
+				buf.WriteString(fmt.Sprintf("%s.Serialize(buffer[idx:])\n%sidx += %s.Len()\n%s", varname, tabString, varname, tabString))
 			}
 		} else if _, ok := enums[f.Type]; ok {
 			buf.WriteString("ngen.PutUint32(buffer[idx:], uint32(")
@@ -314,12 +314,12 @@ func WriteGoSerializeField(f MessageField, scopeDepth int, buf *bytes.Buffer, me
 			buf.WriteString("))")
 			buf.WriteString("\n")
 			writeTabScope(buf, scopeDepth)
-			buf.WriteString("idx+=4\n")
+			buf.WriteString("idx += 4\n")
 		} else {
 			buf.WriteString(n)
 			buf.WriteString(".Serialize(buffer[idx:])\n")
 			writeTabScope(buf, scopeDepth)
-			buf.WriteString("idx+=")
+			buf.WriteString("idx += ")
 			buf.WriteString(n)
 			buf.WriteString(".Len()\n")
 		}
