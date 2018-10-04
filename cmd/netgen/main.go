@@ -223,7 +223,7 @@ func main() {
 			ioutil.WriteFile(filepath.Join(filepath.Join(wd, *outdir), "deserial.go"), buf.Bytes(), 0644)
 
 			buf.Reset()
-			buf.WriteString(fmt.Sprintf("package %s\n\nimport \"github.com/lologarithm/netgen/lib/ngen\"", pkgname))
+			buf.WriteString(fmt.Sprintf("%spackage %s\n\nimport \"github.com/lologarithm/netgen/lib/ngen\"", generate.HeaderComment(), pkgname))
 			for _, msg := range messages {
 				buf.WriteString(generate.GoSerializers(msg, messages, messageMap, enums, enumMap))
 			}

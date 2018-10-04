@@ -10,7 +10,7 @@ import (
 // Also generate the new lib!
 func WriteJSConverter(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) []byte {
 	buf := &bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("package %s\n\nimport (\n\t\"github.com/gopherjs/gopherjs/js\"\n\t\"github.com/lologarithm/netgen/lib/ngen\"\n)\n\n", pkgname))
+	buf.WriteString(fmt.Sprintf("%spackage %s\n\nimport (\n\t\"github.com/gopherjs/gopherjs/js\"\n\t\"github.com/lologarithm/netgen/lib/ngen\"\n)\n\n", HeaderComment(), pkgname))
 
 	// 1.a. Parent parser function
 	buf.WriteString("// ParseNetMessageJS accepts input of js.Object, parses it and returns a Net message.\n")
