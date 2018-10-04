@@ -23,11 +23,11 @@ func GoLibHeader(pkgname string, messages []Message, messageMap map[string]Messa
 	gobuf.WriteString(fmt.Sprintf("%spackage %s\n\nimport (\n\t\"github.com/lologarithm/netgen/lib/ngen\"", HeaderComment(), pkgname))
 	gobuf.WriteString("\n)\n\n\n")
 	// 1. List type values!
-	gobuf.WriteString("const (\n\tUnknownMsgType ngen.MessageType = iota\n\tAckMsgType\n")
+	gobuf.WriteString("const (\n\tUnknownMsgType ngen.MessageType = iota\n\tAckMsgType\n\n")
 	for _, t := range messages {
 		gobuf.WriteString("\t")
 		gobuf.WriteString(t.Name)
-		gobuf.WriteString("MsgType\n")
+		gobuf.WriteString(fmt.Sprintf("MsgType = %d\n", MessageID(t)))
 	}
 	gobuf.WriteString(")\n\n")
 
