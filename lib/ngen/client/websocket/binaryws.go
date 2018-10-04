@@ -4,20 +4,21 @@ package client
 
 import (
 	"github.com/lologarithm/netgen/lib/ngen"
+	"github.com/lologarithm/netgen/lib/ngen/client"
 	"golang.org/x/net/websocket"
 )
 
-func AcceptConn(conn *websocket.Conn) Client {
+func AcceptConn(conn *websocket.Conn) *client.Client {
 	// fmt.Printf("Accepting Connection: %s\n", conn.RemoteAddr().String())
-	return Client{
+	return &client.Client{
 		Name:     conn.RemoteAddr().String(),
 		Conn:     &BinaryWebsocket{socket: conn},
-		Outgoing: make(chan *ngen.Packet, 100),
-		Incoming: make(chan *ngen.Packet, 100),
+		Outgoing: make(chan *ngen.Packet, 20),
+		Incoming: make(chan *ngen.Packet, 20),
 	}
 }
 
-func New(url, origin string) (*Client, error) {
+func New(url, origin string) (*client.Client, error) {
 	conn, err := websocket.Dial(url, "", origin)
 	if err != nil {
 		return nil, err
@@ -26,10 +27,10 @@ func New(url, origin string) (*Client, error) {
 		socket: conn,
 	}
 
-	return &Client{
+	return &client.Client{
 		Conn:     ws,
-		Outgoing: make(chan *ngen.Packet, 100),
-		Incoming: make(chan *ngen.Packet, 100),
+		Outgoing: make(chan *ngen.Packet, 20),
+		Incoming: make(chan *ngen.Packet, 20),
 	}, nil
 }
 

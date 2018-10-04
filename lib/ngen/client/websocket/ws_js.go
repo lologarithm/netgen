@@ -8,9 +8,10 @@ import (
 	"github.com/gopherjs/gopherjs/js"
 	"github.com/gopherjs/websocket/websocketjs"
 	"github.com/lologarithm/netgen/lib/ngen"
+	"github.com/lologarithm/netgen/lib/ngen/client"
 )
 
-func New(url, origin string) (*Client, error) {
+func New(url, origin string) (client.Client, error) {
 	conn, err := websocketjs.New(url)
 	if err != nil {
 		return nil, err
@@ -18,43 +19,54 @@ func New(url, origin string) (*Client, error) {
 	conn.BinaryType = "arraybuffer"
 
 	ws := &wsjs{
-		conn:   conn,
-		buffer: make([]byte, 4096),
-		idx:    0,
+		conn:     conn,
+		buffer:   make([]byte, 4096),
+		idx:      0,
+		framebuf: make(chan []byte, 2), // can hold 2 frames
 	}
 
 	onMessage := func(ev *js.Object) {
 		jsarr := js.Global.Get("Uint8Array").New(ev)
 		slice := jsarr.Interface().([]byte)
-		copy(ws.buffer[ws.idx:], slice)
-		ws.idx += len(slice)
+		go func() {
+			ws.framebuf <- slice
+		}
 	}
 
 	conn.AddEventListener("message", false, onMessage)
 
 	return &Client{
 		Conn:     ws,
-		Outgoing: make(chan *ngen.Packet, 100),
-		Incoming: make(chan *ngen.Packet, 100),
+		Outgoing: make(chan *ngen.Packet, 20),
+		Incoming: make(chan *ngen.Packet, 20),
 	}, nil
 }
 
 type wsjs struct {
-	conn   *websocketjs.WebSocket
-	buffer []byte
-	idx    int
+	conn     *websocketjs.WebSocket
+	buffer   []byte
+	idx      int
+	framebuf chan []byte
 }
 
 func (ws *wsjs) Read(p []byte) (int, error) {
-	for ws.idx == 0 {
-		// So this only works because JS is single threaded.... this is probably bad.
-		// Just waiting for an event to push data onto the struct.
-		time.Sleep(time.Millisecond * 100)
-		// TODO: implement a read timeout here.
+	if ws.idx == 0 {
+		select {
+		case 	slice := <- ws.framebuf:
+			copy(ws.buffer[ws.idx:], slice)
+			ws.idx += len(slice)
+		case <-time.NewTimer(time.Second*60).C:
+			// No message for 60 seconds.. seems like its dead?
+			return 0, errors.New("failed to read")
+		}
 	}
+
 	num := ws.idx
+	if len(p) < num {
+		num = len(p) // can't read more than will fit.
+	}
 	copy(p, ws.buffer[:num])
-	ws.idx = 0
+	ws.idx -= num
 	return num, nil
 }
 
