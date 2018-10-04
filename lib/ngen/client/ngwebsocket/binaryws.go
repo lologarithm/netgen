@@ -1,6 +1,6 @@
 // +build !js
 
-package client
+package ngwebsocket
 
 import (
 	"github.com/lologarithm/netgen/lib/ngen"

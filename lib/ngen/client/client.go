@@ -41,7 +41,7 @@ func Reader(c *Client, parser ngen.NetParser) {
 			continue
 		}
 
-		p, ok := ngen.NextPacket(buffer, parser)
+		p, ok := ngen.NextPacket(buffer[:idx+n], parser)
 		if !ok {
 			// increment idx by how much we wrote.
 			idx += n

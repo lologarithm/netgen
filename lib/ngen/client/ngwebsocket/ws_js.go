@@ -1,8 +1,9 @@
 // +build js
 
-package client
+package ngwebsocket
 
 import (
+	"errors"
 	"time"
 
 	"github.com/gopherjs/gopherjs/js"
@@ -11,12 +12,16 @@ import (
 	"github.com/lologarithm/netgen/lib/ngen/client"
 )
 
-func New(url, origin string) (client.Client, error) {
+// New has _ to follow the pattern from the Go client.
+func New(url, _ string) (*client.Client, error) {
 	conn, err := websocketjs.New(url)
 	if err != nil {
 		return nil, err
 	}
 	conn.BinaryType = "arraybuffer"
+	conn.AddEventListener("open", false, func(ev *js.Object) {
+		print("connected: ", ev)
+	})
 
 	ws := &wsjs{
 		conn:     conn,
@@ -26,16 +31,16 @@ func New(url, origin string) (client.Client, error) {
 	}
 
 	onMessage := func(ev *js.Object) {
-		jsarr := js.Global.Get("Uint8Array").New(ev)
+		jsarr := js.Global.Get("Uint8Array").New(ev.Get("data"))
 		slice := jsarr.Interface().([]byte)
 		go func() {
 			ws.framebuf <- slice
-		}
+		}()
 	}
 
 	conn.AddEventListener("message", false, onMessage)
 
-	return &Client{
+	return &client.Client{
 		Conn:     ws,
 		Outgoing: make(chan *ngen.Packet, 20),
 		Incoming: make(chan *ngen.Packet, 20),
@@ -52,10 +57,10 @@ type wsjs struct {
 func (ws *wsjs) Read(p []byte) (int, error) {
 	if ws.idx == 0 {
 		select {
-		case 	slice := <- ws.framebuf:
+		case slice := <-ws.framebuf:
 			copy(ws.buffer[ws.idx:], slice)
 			ws.idx += len(slice)
-		case <-time.NewTimer(time.Second*60).C:
+		case <-time.NewTimer(time.Second * 60).C:
 			// No message for 60 seconds.. seems like its dead?
 			return 0, errors.New("failed to read")
 		}
@@ -75,7 +80,6 @@ func (ws *wsjs) Close() error {
 }
 
 func (ws *wsjs) Write(p []byte) (int, error) {
-	err = ws.conn.Send(p)
 	// technically N is wrong here, but the err should make this ok...
-	return len(p), err
+	return len(p), ws.conn.Send(p)
 }

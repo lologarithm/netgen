@@ -16,7 +16,12 @@ type Buffer struct {
 }
 
 func NewBuffer(b []byte) *Buffer {
-	ib := js.InternalObject(b).Get("$array").Get("buffer")
+	bytejs := js.InternalObject(b)
+	arr := bytejs.Get("$array")
+	ib := arr.Get("buffer")
+	if bytejs.Get("$offset") != js.InternalObject(0) || bytejs.Get("$length") != bytejs.Get("byteLength") {
+		ib = ib.Call("slice", bytejs.Get("$offset"), bytejs.Get("$offset").Int()+bytejs.Get("$length").Int())
+	}
 	dv := js.Global.Get("DataView").New(ib)
 	return &Buffer{buf: b, ab: ib, view: dv}
 }
@@ -57,7 +62,7 @@ func (b *Buffer) ReadUint32() (uint32, error) {
 	if len(b.buf) < int(b.loc+4) {
 		return 0, io.EOF
 	}
-	v := b.view.Call("getUint32", b.loc, true).Int()
+	v := b.view.Call("getUint32", b.loc, js.InternalObject(true)).Int()
 	b.loc += 4
 	return uint32(v), nil
 }
@@ -66,7 +71,7 @@ func (b *Buffer) ReadInt32() (int32, error) {
 	if len(b.buf) < int(b.loc+4) {
 		return 0, io.EOF
 	}
-	v := b.view.Call("getUint32", b.loc, true).Int()
+	v := b.view.Call("getUint32", b.loc, js.InternalObject(true)).Int()
 	b.loc += 4
 	return int32(v), nil
 }

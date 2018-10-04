@@ -10,6 +10,8 @@ import (
 	"strings"
 )
 
+// TODO: fix this to generate in the correct location!
+// Also generate the new lib!
 func WriteJSConverter(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) {
 	buf := &bytes.Buffer{}
 	pwd, err := filepath.Abs(filepath.Dir(os.Args[0]))
@@ -26,7 +28,7 @@ func WriteJSConverter(pkgname string, messages []Message, messageMap map[string]
 
 	// 1.a. Parent parser function
 	buf.WriteString("// ParseNetMessageJS accepts input of js.Object, parses it and returns a Net message.\n")
-	buf.WriteString(fmt.Sprintf("func ParseNetMessageJS(jso *js.Object, t %s.MessageType) %s.Net {\n", pkgname, pkgname))
+	buf.WriteString(fmt.Sprintf("func ParseNetMessageJS(jso *js.Object, t %s.MessageType) ngen.Net {\n", pkgname))
 	buf.WriteString("\tswitch t {\n")
 	for _, t := range messages {
 		buf.WriteString(fmt.Sprintf("\tcase %s.", pkgname))
