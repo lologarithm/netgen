@@ -8,10 +8,12 @@ import (
 	"go/parser"
 	"go/token"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/lologarithm/netgen/generate"
@@ -94,6 +96,7 @@ func main() {
 									name = tfi.Names[0].Name
 								}
 
+								customOrder := -1
 								if tfi.Tag != nil && len(tfi.Tag.Value) > 0 {
 									doSkip := false
 									tag := reflect.StructTag(tfi.Tag.Value[1 : len(tfi.Tag.Value)-1])
@@ -101,9 +104,15 @@ func main() {
 									if ok {
 										tags := strings.Split(tagv, ",")
 										for _, t := range tags {
-											if t == "none" {
+											if t == "-" {
 												doSkip = true
 												break
+											} else {
+												// This is therefore a verioning tag
+												customOrder, err = strconv.Atoi(t)
+												if err != nil {
+													log.Fatalf("Invalid ngen field tag (%s) found at: %s", t, fset.Position(tfi.Pos()).String())
+												}
 											}
 										}
 									}
@@ -125,17 +134,19 @@ func main() {
 								if identType.Obj != nil {
 									if dec, ok := identType.Obj.Decl.(*ast.TypeSpec); ok {
 										if _, ok := dec.Type.(*ast.InterfaceType); ok {
-											fmt.Printf("setting interface true: %s\n", name)
 											isInterface = true
 										}
 									}
+								}
+								if customOrder == -1 {
+									customOrder = len(fields)
 								}
 								fields = append(fields, generate.MessageField{
 									Name:      name,
 									Type:      typeval,
 									Array:     isArray,
 									Pointer:   isPointer,
-									Order:     len(fields),
+									Order:     customOrder,
 									Size:      size,
 									Embedded:  emb,
 									Interface: isInterface,
@@ -202,8 +213,14 @@ func main() {
 		// 	// TODO: also create the imports serializers?
 		// }
 	}
-	// 2. search public types for public fields with public types (std or public structs)
-	// 3. build up types required
+	for _, msg := range messages {
+		// 1. figure out which fields are versioned.
+		for _, f := range msg.Fields {
+			if f.Versioned {
+				f.Order += len(msg.Fields)
+			}
+		}
+	}
 
 	if outdir == nil || *outdir == "" {
 		outdir = dir

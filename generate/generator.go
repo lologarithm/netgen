@@ -4,9 +4,10 @@ import "hash/crc32"
 
 // Message is a message that can be serialized across network.
 type Message struct {
-	Name     string         // name of message
-	Fields   []MessageField // list of fields on the message
-	SelfSize int            // size of message not counting sub objects
+	Name      string         // name of message
+	Fields    []MessageField // list of fields on the message
+	Versioned bool           // If this message contains versioning tags
+	SelfSize  int            // size of message not counting sub objects
 }
 
 func MessageID(m Message) uint32 {
@@ -40,6 +41,7 @@ type MessageField struct {
 	Size      int
 	Embedded  bool
 	Interface bool // used only for generating from existing interfaces
+	Versioned bool
 }
 
 // Allowed types to generate from

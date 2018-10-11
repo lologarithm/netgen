@@ -16,7 +16,7 @@ func main() {
 }
 
 type Benchy struct {
-	Name     string
+	Name     string `ngen:"lol"`
 	BirthDay int64
 	Phone    string
 	Siblings int32

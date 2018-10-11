@@ -1,5 +1,4 @@
-netgen
---------------------
+# netgen #
 ![circleci status](https://circleci.com/gh/lologarithm/netgen.svg?&style=shield)
 
 netgen is a simple go serialization library
@@ -9,8 +8,7 @@ C# generator is in progress but has fallen behind with some of the new features 
 
 binary is now located in cmd/netgen
 
-Usage
--------------------
+## Usage ##
 Package declaration defines the package name of the output (which for now just outputs into the current directory)
 
 Supported field types are:
@@ -25,20 +23,52 @@ Supported field types are:
   - Example: []int or []MyStruct
 - Structs
 - Pointers to Structs
-  - Example "MyField *MyStruct"
+  - Example "MyField \*MyStruct"
+  - Primitive pointers are not currently supported
 - Enums (always serializes as int32 currently)
-- Interfaces (as long as the interface also implements ngen.Net and the underlying struct is defined in the same package)
+- Interfaces (as long as the interface also implements ngen.Net and the structs that implement the interface are defined in the same package)
+- Ignored fields using field tag `ngen:"-"`
 
 Use looks like
 ```
-netgen --dir=./my/go/sourcedir --out=./my/go/serializersdir --gen=go
+netgen --dir=./my/go/sourcedir --gen=go
 ```
-
-`out` defaults to the input package
 
 See the benchmark package for some example generated code.
 
 Currently this generates serialization code for a single package at a time. Imported types will not work.
+
+
+## Versioned Data ##
+
+Versioning is supported via field tags.
+
+`ngen:X` where X is the order of the field. This allows order of fields to be tracked across different generations of the struct.
+Any field without an order number will not be versioned.
+A struct can be converted to versioned by setting the field order to be the same as the current struct field order.
+
+### Example: ###
+From:
+```
+type S struct {
+  A int
+  B string
+  C *S
+}
+```
+
+To:
+```
+type S struct {
+  A int    `ngen:"1"`
+  B string `ngen:"2"`
+  C *S     `ngen:"3"`
+}
+```
+
+Once all producers of the struct are converted to the 'versioned' code you can then start to make changes (removing fields etc)
+
+## Benchmarks ##
 
 Benchmarked using go-serialization-benchmark on a lenovo w540 laptop running ubuntu 16.04
 ```
