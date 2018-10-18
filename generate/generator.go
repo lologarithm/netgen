@@ -12,10 +12,7 @@ type Message struct {
 
 func MessageID(m Message) uint32 {
 	v := crc32.NewIEEE()
-	for _, f := range m.Fields {
-		v.Write([]byte(f.Name))
-		v.Write([]byte(f.Type))
-	}
+	v.Write([]byte(m.Name))
 	return v.Sum32()
 }
 
@@ -41,7 +38,6 @@ type MessageField struct {
 	Size      int
 	Embedded  bool
 	Interface bool // used only for generating from existing interfaces
-	Versioned bool
 }
 
 // Allowed types to generate from

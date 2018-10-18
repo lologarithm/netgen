@@ -18,6 +18,55 @@ func NewPacket(msg Net) *Packet {
 	}
 }
 
+type Settings struct {
+	FieldVersions map[MessageType][]byte
+
+	// FUTURE IDEA: negociate messages that don't need variable length
+	// then we can remove that value from every message.
+	FixedSizeMessages map[MessageType]int
+}
+
+func (v Settings) Serialize(buffer []byte) {
+	i := 4
+	PutUint32(buffer, uint32(len(v.FieldVersions)))
+	for k, fv := range v.FieldVersions {
+		PutUint32(buffer[i:], uint32(k))
+		i += 4
+		buffer[i] = byte(len(fv))
+		i += 1
+		copy(buffer[i:], fv)
+		i += len(fv)
+	}
+}
+
+func (v Settings) Len() int {
+	total := 4
+	for _, fv := range v.FieldVersions {
+		total += 5 + len(fv) // Field key (4) + field length (1) + field values (len of array)
+	}
+	return total
+}
+
+func (v Settings) MsgType() MessageType {
+	return 0
+}
+
+func DeserializeSettings(b *Buffer) *Settings {
+	s := &Settings{}
+	num, _ := b.ReadInt()
+	s.FieldVersions = make(map[MessageType][]byte, num)
+	for i := 0; i < num; i++ {
+		// First read the type
+		k, _ := b.ReadUint32()
+
+		// Tomfoolery to have byte length array instead of uint32
+		v, _ := b.ReadByte()
+		buf, _ := b.readByteSlice(uint32(v))
+		s.FieldVersions[MessageType(k)] = buf
+	}
+	return s
+}
+
 type Packet struct {
 	Header Header
 	NetMsg Net
@@ -54,9 +103,9 @@ func ParseHeader(rawBytes []byte) (mf Header, ok bool) {
 	return mf, true
 }
 
-type NetParser func(Packet, *Buffer) Net
+type NetParser func(Packet, *Buffer, *Settings) Net
 
-func NextPacket(rawBytes []byte, parser NetParser) (packet Packet, ok bool) {
+func NextPacket(rawBytes []byte, parser NetParser, ver *Settings) (packet Packet, ok bool) {
 	packet.Header, ok = ParseHeader(rawBytes)
 	if !ok {
 		return
@@ -64,7 +113,7 @@ func NextPacket(rawBytes []byte, parser NetParser) (packet Packet, ok bool) {
 
 	ok = false
 	if packet.Len() <= len(rawBytes) {
-		packet.NetMsg = parser(packet, NewBuffer(rawBytes[HeaderLen:packet.Len()]))
+		packet.NetMsg = parser(packet, NewBuffer(rawBytes[HeaderLen:packet.Len()]), ver)
 		if packet.NetMsg != nil {
 			ok = true
 		}

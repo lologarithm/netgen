@@ -16,9 +16,7 @@ type server struct {
 // runClient is the server client closure.
 // It holds references to the outbound/incoming
 func runClient(c *client.Client, ss *server) {
-	go client.Sender(c)
-	go client.Reader(c, models.ParseNetMessage)
-
+	models.ManageClient(c)
 	for packet := range c.Incoming {
 		if packet == nil {
 			fmt.Printf("%s: Nil packet, starting shutdown of client conn.\n", c.Name)

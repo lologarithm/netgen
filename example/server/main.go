@@ -20,7 +20,7 @@ func main() {
 	}
 
 	http.Handle("/ws", websocket.Handler(func(conn *websocket.Conn) {
-		log.Printf("Accepting socket %#v.", conn.RemoteAddr())
+		log.Printf("Accepting socket from %#v.", conn.RemoteAddr())
 		client := ngwebsocket.AcceptConn(conn)
 		runClient(client, server)
 	}))

@@ -47,6 +47,8 @@ Versioning is supported via field tags.
 Any field without an order number will not be versioned.
 A struct can be converted to versioned by setting the field order to be the same as the current struct field order.
 
+If a struct has version tags all fields must be versioned. This is to prevent mistakes in field ordering. Use '-' to ignore a field.
+
 ### Example: ###
 From:
 ```
@@ -60,15 +62,16 @@ type S struct {
 To:
 ```
 type S struct {
-  A int    `ngen:"1"`
-  B string `ngen:"2"`
-  C *S     `ngen:"3"`
+  A int    `ngen:"2"`
+  B string `ngen:"3"`
+  C *S     `ngen:"4"`
 }
 ```
 
 Once all producers of the struct are converted to the 'versioned' code you can then start to make changes (removing fields etc)
 
 ## Benchmarks ##
+These are old benchmarks of the 'unversioned' de/serializers
 
 Benchmarked using go-serialization-benchmark on a lenovo w540 laptop running ubuntu 16.04
 ```

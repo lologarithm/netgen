@@ -13,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -113,6 +114,7 @@ func main() {
 												if err != nil {
 													log.Fatalf("Invalid ngen field tag (%s) found at: %s", t, fset.Position(tfi.Pos()).String())
 												}
+
 											}
 										}
 									}
@@ -140,6 +142,8 @@ func main() {
 								}
 								if customOrder == -1 {
 									customOrder = len(fields)
+								} else {
+									msg.Versioned = true
 								}
 								fields = append(fields, generate.MessageField{
 									Name:      name,
@@ -213,12 +217,21 @@ func main() {
 		// 	// TODO: also create the imports serializers?
 		// }
 	}
+
+	// Validate that we are correctly using versioning or not.
 	for _, msg := range messages {
-		// 1. figure out which fields are versioned.
+		if !msg.Versioned {
+			continue
+		}
+		sort.Slice(msg.Fields, func(i int, j int) bool {
+			return msg.Fields[i].Order < msg.Fields[j].Order
+		})
+		seen := map[int]bool{}
 		for _, f := range msg.Fields {
-			if f.Versioned {
-				f.Order += len(msg.Fields)
+			if ok := seen[f.Order]; ok {
+				log.Fatalf("Duplicate Field IDs on versioned struct: %s", msg.Name)
 			}
+			seen[f.Order] = true
 		}
 	}
 
@@ -237,18 +250,18 @@ func main() {
 				buf.WriteString(generate.GoDeserializers(msg, messages, messageMap, enums, enumMap))
 			}
 
-			ioutil.WriteFile(filepath.Join(filepath.Join(wd, *outdir), "deserial.go"), buf.Bytes(), 0644)
+			ioutil.WriteFile(filepath.Join(filepath.Join(wd, *outdir), "ngenDeserial.go"), buf.Bytes(), 0644)
 
 			buf.Reset()
 			buf.WriteString(fmt.Sprintf("%spackage %s\n\nimport \"github.com/lologarithm/netgen/lib/ngen\"", generate.HeaderComment(), pkgname))
 			for _, msg := range messages {
 				buf.WriteString(generate.GoSerializers(msg, messages, messageMap, enums, enumMap))
 			}
-			ioutil.WriteFile(filepath.Join(pkgpath, "gongen.go"), buf.Bytes(), 0644)
+			ioutil.WriteFile(filepath.Join(pkgpath, "ngenSerial.go"), buf.Bytes(), 0644)
 		case "js":
 			jsfile := generate.WriteJSConverter(pkgname, messages, messageMap, enums, enumMap)
 			rootpkg := filepath.Join(wd, *outdir)
-			ioutil.WriteFile(path.Join(rootpkg, "jsSerial.go"), jsfile, 0666)
+			ioutil.WriteFile(path.Join(rootpkg, "ngenjs.go"), jsfile, 0666)
 
 		case "cs":
 			// generate.WriteCS(messages, messageMap)

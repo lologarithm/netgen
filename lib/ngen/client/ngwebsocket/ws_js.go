@@ -7,21 +7,15 @@ import (
 	"time"
 
 	"github.com/gopherjs/gopherjs/js"
-	"github.com/gopherjs/websocket/websocketjs"
 	"github.com/lologarithm/netgen/lib/ngen"
 	"github.com/lologarithm/netgen/lib/ngen/client"
 )
 
 // New has _ to follow the pattern from the Go client.
-func New(url, _ string) (*client.Client, error) {
-	conn, err := websocketjs.New(url)
-	if err != nil {
-		return nil, err
-	}
-	conn.BinaryType = "arraybuffer"
-	conn.AddEventListener("open", false, func(ev *js.Object) {
-		print("connected: ", ev)
-	})
+func New(url, _ string, onConnect func()) (*client.Client, error) {
+	conn := js.Global.Get("WebSocket").New(url)
+	conn.Set("binaryType", "arraybuffer")
+	conn.Call("addEventListener", "open", func(ev *js.Object) { onConnect() }, false)
 
 	ws := &wsjs{
 		conn:     conn,
@@ -38,17 +32,17 @@ func New(url, _ string) (*client.Client, error) {
 		}()
 	}
 
-	conn.AddEventListener("message", false, onMessage)
+	conn.Call("addEventListener", "message", onMessage, false)
 
 	return &client.Client{
 		Conn:     ws,
-		Outgoing: make(chan *ngen.Packet, 20),
-		Incoming: make(chan *ngen.Packet, 20),
+		Outgoing: make(chan *ngen.Packet, 10),
+		Incoming: make(chan *ngen.Packet, 10),
 	}, nil
 }
 
 type wsjs struct {
-	conn     *websocketjs.WebSocket
+	conn     *js.Object
 	buffer   []byte
 	idx      int
 	framebuf chan []byte
@@ -76,10 +70,24 @@ func (ws *wsjs) Read(p []byte) (int, error) {
 }
 
 func (ws *wsjs) Close() error {
-	return ws.conn.Close()
+	ws.conn.Call("close")
+	return nil
 }
 
 func (ws *wsjs) Write(p []byte) (int, error) {
 	// technically N is wrong here, but the err should make this ok...
-	return len(p), ws.conn.Send(p)
+	var err error
+	defer func() {
+		e := recover()
+		if e == nil {
+			return
+		}
+		if jsErr, ok := e.(*js.Error); ok && jsErr != nil {
+			err = jsErr
+		} else {
+			panic(e)
+		}
+	}()
+	ws.conn.Call("send", p)
+	return len(p), err
 }
