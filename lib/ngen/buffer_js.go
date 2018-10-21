@@ -129,12 +129,16 @@ func (b *Buffer) ReadByteSlice() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(b.buf) < int(b.loc+l) {
+	return b.readByteSlice(l)
+}
+
+func (b *Buffer) readByteSlice(length uint32) ([]byte, error) {
+	if len(b.buf) < int(b.loc+length) {
 		return nil, io.EOF
 	}
-	v := make([]byte, l)
-	copy(v, b.buf[b.loc:b.loc+l])
-	b.loc += l
+	v := make([]byte, length)
+	copy(v, b.buf[b.loc:b.loc+length])
+	b.loc += length
 	return v, nil
 }
 

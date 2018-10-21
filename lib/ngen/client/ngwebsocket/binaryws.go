@@ -8,17 +8,20 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+// AcceptConn is used by a server to accept a new connection
+// from a client.
 func AcceptConn(conn *websocket.Conn) *client.Client {
 	// fmt.Printf("Accepting Connection: %s\n", conn.RemoteAddr().String())
 	return &client.Client{
 		Name:     conn.RemoteAddr().String(),
 		Conn:     &BinaryWebsocket{socket: conn},
-		Outgoing: make(chan *ngen.Packet, 20),
-		Incoming: make(chan *ngen.Packet, 20),
+		Outgoing: make(chan *ngen.Packet, 10),
+		Incoming: make(chan *ngen.Packet, 10),
 	}
 }
 
-func New(url, origin string) (*client.Client, error) {
+// New is used by a go client to open a websocket to a server.
+func New(url, origin string, onOpen func()) (*client.Client, error) {
 	conn, err := websocket.Dial(url, "", origin)
 	if err != nil {
 		return nil, err
@@ -26,11 +29,16 @@ func New(url, origin string) (*client.Client, error) {
 	ws := &BinaryWebsocket{
 		socket: conn,
 	}
+	if onOpen != nil {
+		go func() {
+			onOpen()
+		}()
+	}
 
 	return &client.Client{
 		Conn:     ws,
-		Outgoing: make(chan *ngen.Packet, 20),
-		Incoming: make(chan *ngen.Packet, 20),
+		Outgoing: make(chan *ngen.Packet, 10),
+		Incoming: make(chan *ngen.Packet, 10),
 	}, nil
 }
 

@@ -52,7 +52,10 @@ func WriteJSConvertField(buf *bytes.Buffer, f MessageField, subindex string, msg
 		setname += "[" + subindex + "]"
 	}
 
-	if f.Array {
+	if f.Interface {
+		getnametype := fmt.Sprintf("Get(\"%sType\")", f.Name)
+		buf.WriteString(fmt.Sprintf("%s = ParseNetMessageJS(jso.%s, MessageType(jso.%s.Int())).(%s)", setname, getname, getnametype, f.Type))
+	} else if f.Array {
 		// We have an array
 		buf.WriteString(setname)
 		buf.WriteString(" = make([]")
@@ -70,12 +73,7 @@ func WriteJSConvertField(buf *bytes.Buffer, f MessageField, subindex string, msg
 		buf.WriteString("\n\t}")
 	} else if _, ok := msgMap[f.Type]; ok {
 		// We have another message type
-		if f.Interface {
-			getnametype := fmt.Sprintf("Get(\"%sType\")", f.Name)
-			buf.WriteString(fmt.Sprintf("ParseNetMessageJS(jso.%s, MessageType(jso.%s.Int()))", getname, getnametype))
-			// TODO: Finish gopherjs interface code
-
-		} else if f.Pointer {
+		if f.Pointer {
 			subName := "sub" + f.Name
 			if subindex != "" {
 				subName = "subi"
@@ -91,9 +89,13 @@ func WriteJSConvertField(buf *bytes.Buffer, f MessageField, subindex string, msg
 	} else {
 		buf.WriteString(fmt.Sprintf("%s = ", setname))
 		switch f.Type {
-		case ByteType, Int16Type, Int32Type, Int64Type:
+		case Float64Type:
+			buf.WriteString(fmt.Sprintf("%s(jso.%s.Float())", f.Type, getname))
+		case ByteType, IntType, RuneType, Int16Type, Int32Type, Uint16Type, Uint32Type:
+			buf.WriteString(fmt.Sprintf("%s(jso.%s.Int())", f.Type, getname))
+		case Int64Type:
 			buf.WriteString(fmt.Sprintf("%s(jso.%s.Int64())", f.Type, getname))
-		case Uint16Type, Uint32Type, Uint64Type:
+		case Uint64Type:
 			buf.WriteString(fmt.Sprintf("%s(jso.%s.Uint64())", f.Type, getname))
 		case StringType:
 			buf.WriteString(fmt.Sprintf("jso.%s.String()", getname))

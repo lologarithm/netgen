@@ -8,10 +8,13 @@ import (
 	"go/parser"
 	"go/token"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
 	"reflect"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/lologarithm/netgen/generate"
@@ -94,6 +97,7 @@ func main() {
 									name = tfi.Names[0].Name
 								}
 
+								customOrder := -1
 								if tfi.Tag != nil && len(tfi.Tag.Value) > 0 {
 									doSkip := false
 									tag := reflect.StructTag(tfi.Tag.Value[1 : len(tfi.Tag.Value)-1])
@@ -101,9 +105,16 @@ func main() {
 									if ok {
 										tags := strings.Split(tagv, ",")
 										for _, t := range tags {
-											if t == "none" {
+											if t == "-" {
 												doSkip = true
 												break
+											} else {
+												// This is therefore a verioning tag
+												customOrder, err = strconv.Atoi(t)
+												if err != nil {
+													log.Fatalf("Invalid ngen field tag (%s) found at: %s", t, fset.Position(tfi.Pos()).String())
+												}
+
 											}
 										}
 									}
@@ -125,17 +136,21 @@ func main() {
 								if identType.Obj != nil {
 									if dec, ok := identType.Obj.Decl.(*ast.TypeSpec); ok {
 										if _, ok := dec.Type.(*ast.InterfaceType); ok {
-											fmt.Printf("setting interface true: %s\n", name)
 											isInterface = true
 										}
 									}
+								}
+								if customOrder == -1 {
+									customOrder = len(fields)
+								} else {
+									msg.Versioned = true
 								}
 								fields = append(fields, generate.MessageField{
 									Name:      name,
 									Type:      typeval,
 									Array:     isArray,
 									Pointer:   isPointer,
-									Order:     len(fields),
+									Order:     customOrder,
 									Size:      size,
 									Embedded:  emb,
 									Interface: isInterface,
@@ -202,8 +217,23 @@ func main() {
 		// 	// TODO: also create the imports serializers?
 		// }
 	}
-	// 2. search public types for public fields with public types (std or public structs)
-	// 3. build up types required
+
+	// Validate that we are correctly using versioning or not.
+	for _, msg := range messages {
+		if !msg.Versioned {
+			continue
+		}
+		sort.Slice(msg.Fields, func(i int, j int) bool {
+			return msg.Fields[i].Order < msg.Fields[j].Order
+		})
+		seen := map[int]bool{}
+		for _, f := range msg.Fields {
+			if ok := seen[f.Order]; ok {
+				log.Fatalf("Duplicate Field IDs on versioned struct: %s", msg.Name)
+			}
+			seen[f.Order] = true
+		}
+	}
 
 	if outdir == nil || *outdir == "" {
 		outdir = dir
@@ -220,18 +250,18 @@ func main() {
 				buf.WriteString(generate.GoDeserializers(msg, messages, messageMap, enums, enumMap))
 			}
 
-			ioutil.WriteFile(filepath.Join(filepath.Join(wd, *outdir), "deserial.go"), buf.Bytes(), 0644)
+			ioutil.WriteFile(filepath.Join(filepath.Join(wd, *outdir), "ngenDeserial.go"), buf.Bytes(), 0644)
 
 			buf.Reset()
 			buf.WriteString(fmt.Sprintf("%spackage %s\n\nimport \"github.com/lologarithm/netgen/lib/ngen\"", generate.HeaderComment(), pkgname))
 			for _, msg := range messages {
 				buf.WriteString(generate.GoSerializers(msg, messages, messageMap, enums, enumMap))
 			}
-			ioutil.WriteFile(filepath.Join(pkgpath, "gongen.go"), buf.Bytes(), 0644)
+			ioutil.WriteFile(filepath.Join(pkgpath, "ngenSerial.go"), buf.Bytes(), 0644)
 		case "js":
 			jsfile := generate.WriteJSConverter(pkgname, messages, messageMap, enums, enumMap)
 			rootpkg := filepath.Join(wd, *outdir)
-			ioutil.WriteFile(path.Join(rootpkg, "jsSerial.go"), jsfile, 0666)
+			ioutil.WriteFile(path.Join(rootpkg, "ngenjs.go"), jsfile, 0666)
 
 		case "cs":
 			// generate.WriteCS(messages, messageMap)

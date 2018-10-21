@@ -1,10 +1,19 @@
 package generate
 
+import "hash/crc32"
+
 // Message is a message that can be serialized across network.
 type Message struct {
-	Name     string         // name of message
-	Fields   []MessageField // list of fields on the message
-	SelfSize int            // size of message not counting sub objects
+	Name      string         // name of message
+	Fields    []MessageField // list of fields on the message
+	Versioned bool           // If this message contains versioning tags
+	SelfSize  int            // size of message not counting sub objects
+}
+
+func MessageID(m Message) uint32 {
+	v := crc32.NewIEEE()
+	v.Write([]byte(m.Name))
+	return v.Sum32()
 }
 
 // Enum represents a list of values with a shared type
