@@ -29,6 +29,11 @@ func New(url, origin string, onOpen func()) (*client.Client, error) {
 	ws := &BinaryWebsocket{
 		socket: conn,
 	}
+	if onOpen != nil {
+		go func() {
+			onOpen()
+		}()
+	}
 
 	return &client.Client{
 		Conn:     ws,

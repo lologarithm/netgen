@@ -69,15 +69,21 @@ func Reader(c *Client, parser ngen.NetParser, remote chan *ngen.Settings) {
 }
 
 func Sender(c *Client, myVer *ngen.Settings, remote chan *ngen.Settings) {
-	// First message out is the settings (versioning info) for this instance.
-	// This will allow the other side to read our versioned structs.
-	n, err := c.Conn.Write(ngen.NewPacket(myVer).Pack(nil))
-	if err != nil || n == 0 {
-		fmt.Printf("Failed to write handshake settings with remote: %s", err.Error())
-		return
+	var remoteSettings *ngen.Settings
+
+	// Only send and wait for versioning message if we have versioned messages
+	if len(myVer.FieldVersions) > 0 {
+		// First message out is the settings (versioning info) for this instance.
+		// This will allow the other side to read our versioned structs.
+		n, err := c.Conn.Write(ngen.NewPacket(myVer).Pack(nil))
+		if err != nil || n == 0 {
+			fmt.Printf("Failed to write handshake settings with remote: %s", err.Error())
+			return
+		}
+
+		remoteSettings = <-remote
 	}
 
-	remoteSettings := <-remote
 	for m := range c.Outgoing {
 		if m == nil {
 			return // Empty message means die
