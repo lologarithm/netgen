@@ -37,6 +37,10 @@ func (c *ClientJS) SendMessage(jso *js.Object) {
 	c.Outgoing <- ngen.NewPacket(newmodels.MessageFromJS(jso))
 }
 
+func (c *ClientJS) SendVerMessage(jso *js.Object) {
+	c.Outgoing <- ngen.NewPacket(newmodels.VersionedMessageFromJS(jso))
+}
+
 func (c *ClientJS) Dial(url string) {
 	go func() {
 		if url == "" {

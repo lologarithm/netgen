@@ -1,7 +1,7 @@
 package ngen
 
 type Net interface {
-	Serialize([]byte)
+	Serialize([]byte, *Settings)
 	Len() int
 	MsgType() MessageType
 }
@@ -26,7 +26,8 @@ type Settings struct {
 	FixedSizeMessages map[MessageType]int
 }
 
-func (v Settings) Serialize(buffer []byte) {
+// Serialize for Settings doesn't need a settings because it is the settings.
+func (v Settings) Serialize(buffer []byte, _ *Settings) {
 	i := 4
 	PutUint32(buffer, uint32(len(v.FieldVersions)))
 	for k, fv := range v.FieldVersions {
@@ -73,12 +74,12 @@ type Packet struct {
 }
 
 // Pack serializes the content into RawBytes.
-func (p *Packet) Pack() []byte {
+func (p *Packet) Pack(settings *Settings) []byte {
 	buf := make([]byte, p.Len())
 	PutUint32(buf, uint32(p.Header.MsgType))
 	PutUint16(buf[4:], p.Header.Seq)
 	PutUint16(buf[6:], p.Header.ContentLength)
-	p.NetMsg.Serialize(buf[8:])
+	p.NetMsg.Serialize(buf[8:], settings)
 	return buf
 }
 

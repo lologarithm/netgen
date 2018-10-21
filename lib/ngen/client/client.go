@@ -18,7 +18,7 @@ type Client struct {
 // Reader spawns a block for loop reading off the conn on Client
 // it will put all read packets onto the incoming channel.
 // This code requires the conn to not shard packets.
-func Reader(c *Client, parser ngen.NetParser) {
+func Reader(c *Client, parser ngen.NetParser, remote chan *ngen.Settings) {
 	idx := 0
 	buffer := make([]byte, 4096)
 	// Cached versioning info.
@@ -52,6 +52,7 @@ func Reader(c *Client, parser ngen.NetParser) {
 		if p.Header.MsgType == 0 {
 			fmt.Printf("Got remote settings: %#v\n", p.NetMsg)
 			remoteSettings = p.NetMsg.(*ngen.Settings)
+			remote <- remoteSettings // send to 'sender' channel now
 		} else {
 			// Successful packet read
 			c.Incoming <- &p
@@ -67,16 +68,21 @@ func Reader(c *Client, parser ngen.NetParser) {
 	close(c.Incoming)
 }
 
-func Sender(c *Client, ver *ngen.Settings) {
+func Sender(c *Client, myVer *ngen.Settings, remote chan *ngen.Settings) {
 	// First message out is the settings (versioning info) for this instance.
 	// This will allow the other side to read our versioned structs.
-	c.Outgoing <- ngen.NewPacket(ver)
-	fmt.Printf("ver data queued, now reading outgoing packets.\n")
+	n, err := c.Conn.Write(ngen.NewPacket(myVer).Pack(nil))
+	if err != nil || n == 0 {
+		fmt.Printf("Failed to write handshake settings with remote: %s", err.Error())
+		return
+	}
+
+	remoteSettings := <-remote
 	for m := range c.Outgoing {
 		if m == nil {
 			return // Empty message means die
 		}
-		n, err := c.Conn.Write(m.Pack())
+		n, err := c.Conn.Write(m.Pack(remoteSettings))
 		if err != nil {
 			fmt.Printf("Writing failed: %s\n", err.Error())
 			break

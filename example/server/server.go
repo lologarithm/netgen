@@ -25,7 +25,10 @@ func runClient(c *client.Client, ss *server) {
 		switch tmsg := packet.NetMsg.(type) {
 		case *models.Message:
 			fmt.Printf(" Got message: %s\n", tmsg.Message)
-			c.Outgoing <- packet // ECHO FOR SOME REASON
+			c.Outgoing <- packet // ECHO
+		case *models.VersionedMessage:
+			fmt.Printf(" Got versioned message: %#v", tmsg)
+			c.Outgoing <- packet
 		}
 	}
 

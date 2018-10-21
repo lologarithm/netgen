@@ -34,7 +34,7 @@ func GoLibHeader(pkgname string, messages []Message, messageMap map[string]Messa
 			fldbuf.WriteString("},")
 		}
 	}
-	// TODO: Inject settings into the lib
+
 	gobuf.WriteString(fmt.Sprintf(`var Settings = &ngen.Settings {
 		FieldVersions: map[ngen.MessageType][]byte{
 			%s
@@ -43,8 +43,9 @@ func GoLibHeader(pkgname string, messages []Message, messageMap map[string]Messa
 
 	gobuf.WriteString(`
 func ManageClient(c *client.Client) {
-	go client.Sender(c, Settings)
-	go client.Reader(c, ParseNetMessage)
+	settingsSync := make(chan *ngen.Settings)
+	go client.Sender(c, Settings, settingsSync)
+	go client.Reader(c, ParseNetMessage, settingsSync)
 }
 `)
 
@@ -76,13 +77,29 @@ func ManageClient(c *client.Client) {
 // GoSerializers returns the generated code of Serialize, Len, and MessageType for the input msg
 func GoSerializers(msg Message, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) string {
 	gobuf := &bytes.Buffer{}
-	gobuf.WriteString(fmt.Sprintf("\n\nfunc (m %s) Serialize(buffer []byte) {\n", msg.Name))
+	gobuf.WriteString(fmt.Sprintf("\n\nfunc (m %s) Serialize(buffer []byte, settings *ngen.Settings) {\n", msg.Name))
 	if len(msg.Fields) > 0 {
 		gobuf.WriteString("\tidx := 0\n")
 	}
-	for _, f := range msg.Fields {
-		WriteGoSerializeField(f, 1, gobuf, messageMap, enumMap)
+	if msg.Versioned {
+		// If versioned we need to switch on the field indexes
+		fldSwitch := &bytes.Buffer{}
+		for _, f := range msg.Fields {
+			fldSwitch.WriteString(fmt.Sprintf("\t\t\tcase %d:\n", f.Order))
+			WriteGoSerializeField(f, 1, gobuf, messageMap, enumMap)
+		}
+		gobuf.WriteString(fmt.Sprintf(
+			`	for _, fld := range settings.FieldVersions[%d] {
+		switch fld {
+%s		}
+		}
+`, MessageID(msg), fldSwitch.String()))
+	} else {
+		for _, f := range msg.Fields {
+			WriteGoSerializeField(f, 1, gobuf, messageMap, enumMap)
+		}
 	}
+
 	gobuf.WriteString("}\n")
 	gobuf.WriteString(fmt.Sprintf("\nfunc (m %s) Len() int {\n\tmylen := 0\n", msg.Name))
 	for _, f := range msg.Fields {
@@ -102,8 +119,8 @@ func GoSerializers(msg Message, messages []Message, messageMap map[string]Messag
 func GoDeserializers(msg Message, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) string {
 	gobuf := &bytes.Buffer{}
 	gobuf.WriteString(fmt.Sprintf("\nfunc %sDeserialize(buffer *ngen.Buffer, settings *ngen.Settings) (m %s) {\n", msg.Name, msg.Name))
-	// First write non-versioned field deserialize
 	if msg.Versioned {
+		// If versioned we need to switch on the field indexes
 		fldSwitch := &bytes.Buffer{}
 		for _, f := range msg.Fields {
 			fldSwitch.WriteString(fmt.Sprintf("\t\t\tcase %d:\n", f.Order))
@@ -326,12 +343,12 @@ func WriteGoSerializeField(f MessageField, scopeDepth int, buf *bytes.Buffer, me
 					buf.WriteString("idx += 4\n")
 					writeTabScope(buf, scopeDepth)
 				}
-				buf.WriteString(fmt.Sprintf("%s%s.Serialize(buffer[idx:])\n%sidx += %s.Len()\n%s", tabString, varname, tabString, varname, tabString))
+				buf.WriteString(fmt.Sprintf("%s%s.Serialize(buffer[idx:], settings)\n%sidx += %s.Len()\n%s", tabString, varname, tabString, varname, tabString))
 				buf.WriteString("} else {\n")
 				buf.WriteString(fmt.Sprintf("%sbuffer[idx] = 0\n%sidx++\n%s", tabString, tabString, tabString))
 				buf.WriteString("}\n")
 			} else {
-				buf.WriteString(fmt.Sprintf("%s.Serialize(buffer[idx:])\n%sidx += %s.Len()\n%s", varname, tabString, varname, tabString))
+				buf.WriteString(fmt.Sprintf("%s.Serialize(buffer[idx:], settings)\n%sidx += %s.Len()\n%s", varname, tabString, varname, tabString))
 			}
 		} else if _, ok := enums[f.Type]; ok {
 			buf.WriteString("ngen.PutUint32(buffer[idx:], uint32(")
@@ -342,7 +359,7 @@ func WriteGoSerializeField(f MessageField, scopeDepth int, buf *bytes.Buffer, me
 			buf.WriteString("idx += 4\n")
 		} else {
 			buf.WriteString(n)
-			buf.WriteString(".Serialize(buffer[idx:])\n")
+			buf.WriteString(".Serialize(buffer[idx:], settings)\n")
 			writeTabScope(buf, scopeDepth)
 			buf.WriteString("idx += ")
 			buf.WriteString(n)
@@ -436,7 +453,7 @@ func WriteGoDeserialField(f MessageField, includeM bool, scopeDepth int, buf *by
 				buf.WriteString(subName)
 				buf.WriteString(" = ")
 				buf.WriteString(f.Type)
-				buf.WriteString("Deserialize(buffer)\n")
+				buf.WriteString("Deserialize(buffer, settings)\n")
 				writeTabScope(buf, scopeDepth)
 				buf.WriteString("\t")
 				buf.WriteString(n)
@@ -449,7 +466,7 @@ func WriteGoDeserialField(f MessageField, includeM bool, scopeDepth int, buf *by
 				buf.WriteString(n)
 				buf.WriteString(" = ")
 				buf.WriteString(f.Type[0:])
-				buf.WriteString("Deserialize(buffer)\n")
+				buf.WriteString("Deserialize(buffer, settings)\n")
 			}
 		} else if _, ok := enums[f.Type]; ok {
 			name := "tmp" + f.Name

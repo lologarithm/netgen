@@ -68,9 +68,9 @@ type S struct {
 }
 ```
 
-Once all producers of the struct are converted to the 'versioned' code you can then start to make changes (removing fields etc)
+Once all producers of the struct are converted to the 'versioned' code you can then start to make changes (adding/removing fields).
 
-IN PROGRESS: Serializers currently send all fields instead of only the negociated fields. FINISH THIS BEFORE MERGING THIS CODE.
+If there are versioned fields on objects those fields are included in a "Settings" object when the code is compiled. When using the 'ManageClient' generated code the connection will first share the versioning information so that messages can be sent with the agreed on fields.
 
 ## Benchmarks ##
 These are old benchmarks of the 'unversioned' de/serializers
