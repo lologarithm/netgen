@@ -2,32 +2,28 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 
-	"github.com/lologarithm/netgen/example/client/clientnet"
 	"github.com/lologarithm/netgen/example/newmodels"
 	"github.com/lologarithm/netgen/lib/ngen"
+	"github.com/lologarithm/netgen/lib/ngen/client/ngwebsocket"
 )
 
 func main() {
-	c := &clientnet.Client{
-		CEvents: &clientnet.Events{},
+	url := "ws://127.0.0.1:4567/ws"
+	origin := "http://127.0.0.1/"
+	client, err := ngwebsocket.New(url, origin, func() {})
+	if err != nil {
+		fmt.Printf("Failed to connect: %s\n", err.Error())
+		os.Exit(1)
 	}
-	conn := make(chan struct{})
-	c.CEvents.OnConnected(func(v bool) {
-		if !v {
-			log.Fatalf("Failed to connect.")
-		}
-		conn <- struct{}{}
-	})
-	c.Dial("")
-	<-conn
-	c.Outgoing <- ngen.NewPacket(newmodels.Message{
+
+	newmodels.ManageClient(client)
+	client.Outgoing <- ngen.NewPacket(newmodels.Message{
 		Message: "HELLOOOO",
 	})
 
-	for packet := range c.Incoming {
+	for packet := range client.Incoming {
 		if packet == nil {
 			break
 		}
