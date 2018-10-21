@@ -1,2 +1,0 @@
-Got remote settings: &ngen.Settings{FieldVersions:map[ngen.MessageType][]uint8{0x1535ca8c:[]uint8{0x1, 0x2}}, FixedSizeMessages:map[ngen.MessageType]int(nil)}
-Got message: HELLOOOO
