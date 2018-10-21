@@ -500,7 +500,7 @@ func writeInterDeserial(buf *bytes.Buffer, f MessageField, scopeDepth int) {
 		buf.WriteString("m.")
 	}
 	buf.WriteString(f.Name)
-	buf.WriteString(fmt.Sprintf(" = ParseNetMessage(p, buffer).(%s)\n", f.Type))
+	buf.WriteString(fmt.Sprintf(" = ParseNetMessage(p, buffer, settings).(%s)\n", f.Type))
 	writeTabScope(buf, scopeDepth)
 	buf.WriteString("}\n")
 }

@@ -18,8 +18,8 @@ func TestFeaturesOne(t *testing.T) {
 	}
 
 	buff := make([]byte, ft.Len())
-	ft.Serialize(buff)
-	newft := FeaturesOneDeserialize(ngen.NewBuffer(buff))
+	ft.Serialize(buff, nil)
+	newft := FeaturesOneDeserialize(ngen.NewBuffer(buff), nil)
 	if newft.Dynd.V != 1 {
 		t.FailNow()
 	}
@@ -34,9 +34,9 @@ func TestFeatures(t *testing.T) {
 	}
 
 	buff := make([]byte, ft.Len())
-	ft.Serialize(buff)
+	ft.Serialize(buff, nil)
 
-	newft := FeaturesDeserialize(ngen.NewBuffer(buff))
+	newft := FeaturesDeserialize(ngen.NewBuffer(buff), nil)
 
 	if len(ft.Bin) != len(newft.Bin) {
 		t.Fatalf("Binary blob len doesn't match: %v vs %v", ft.Bin, newft.Bin)
@@ -76,7 +76,7 @@ func BenchmarkNetGenMarshal(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		obj := data[rand.Intn(len(data))]
-		obj.Serialize(make([]byte, obj.Len()))
+		obj.Serialize(make([]byte, obj.Len()), nil)
 	}
 }
 
@@ -87,14 +87,14 @@ func BenchmarkNetGenUnmarshal(b *testing.B) {
 	ser := make([]*ngen.Buffer, len(data))
 	for i, d := range data {
 		buf := make([]byte, d.Len())
-		d.Serialize(buf)
+		d.Serialize(buf, nil)
 		ser[i] = ngen.NewBuffer(buf)
 	}
 	b.ReportAllocs()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		n := i % len(ser)
-		o := BenchyDeserialize(ser[n])
+		o := BenchyDeserialize(ser[n], nil)
 		ser[n].Reset()
 		// Validate unmarshalled data.
 		if validate != "" {
