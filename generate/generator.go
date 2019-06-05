@@ -5,6 +5,7 @@ import "hash/crc32"
 // Message is a message that can be serialized across network.
 type Message struct {
 	Name      string         // name of message
+	Package   string         // Source package
 	Fields    []MessageField // list of fields on the message
 	Versioned bool           // If this message contains versioning tags
 	SelfSize  int            // size of message not counting sub objects

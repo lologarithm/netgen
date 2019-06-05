@@ -8,8 +8,8 @@ import (
 	"github.com/gopherjs/gopherjs/js"
 	"github.com/lologarithm/netgen/example/newmodels"
 	"github.com/lologarithm/netgen/lib/ngen"
-	"github.com/lologarithm/netgen/lib/ngen/client"
-	"github.com/lologarithm/netgen/lib/ngen/client/ngwebsocket"
+	"github.com/lologarithm/netgen/lib/ngen/service/client"
+	"github.com/lologarithm/netgen/lib/ngen/service/client/ngwebsocket"
 )
 
 func main() {

@@ -6,7 +6,7 @@ import (
 
 	"github.com/lologarithm/netgen/example/newmodels"
 	"github.com/lologarithm/netgen/lib/ngen"
-	"github.com/lologarithm/netgen/lib/ngen/client/ngwebsocket"
+	"github.com/lologarithm/netgen/lib/ngen/service/client/ngwebsocket"
 )
 
 func main() {

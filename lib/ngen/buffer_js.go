@@ -13,6 +13,7 @@ type Buffer struct {
 	ab   *js.Object
 	view *js.Object
 	loc  uint32
+	Err  error
 }
 
 func NewBuffer(b []byte) *Buffer {
@@ -31,117 +32,236 @@ func (b *Buffer) Reset() {
 }
 
 // ReadByte will read next byte from buffer and increment read location
-func (b *Buffer) ReadByte() (byte, error) {
+func (b *Buffer) ReadByte() byte {
+	if b.Err != nil {
+		return 0
+	}
 	if len(b.buf) < int(b.loc+1) {
-		return 0, io.EOF
+		b.Err = io.EOF
+		return 0
 	}
 	v := b.buf[b.loc]
 	b.loc++
-	return v, nil
+	return v
 }
 
-func (b *Buffer) ReadUint16() (uint16, error) {
+func (b *Buffer) ReadUint16() uint16 {
+	if b.Err != nil {
+		return 0
+	}
 	if len(b.buf) < int(b.loc+2) {
-		return 0, io.EOF
+		b.Err = io.EOF
+		return 0
 	}
 	v := Uint16(b.buf[b.loc:])
 	b.loc += 2
-	return v, nil
+	return v
 }
 
-func (b *Buffer) ReadInt16() (int16, error) {
-	if len(b.buf) < int(b.loc+2) {
-		return 0, io.EOF
+func (b *Buffer) ReadInt16() int16 {
+	return int16(b.ReadUint16())
+}
+
+func (b *Buffer) ReadUint32() uint32 {
+	if b.Err != nil {
+		return 0
 	}
-	v := Uint16(b.buf[b.loc:])
-	b.loc += 2
-	return int16(v), nil
-}
-
-func (b *Buffer) ReadUint32() (uint32, error) {
 	if len(b.buf) < int(b.loc+4) {
-		return 0, io.EOF
+		b.Err = io.EOF
+		return 0
 	}
-	v := b.view.Call("getUint32", b.loc, js.InternalObject(true)).Int()
+	v := uint32(b.buf[b.loc]) | uint32(b.buf[b.loc+1])<<8 | uint32(b.buf[b.loc+2])<<16 | uint32(b.buf[b.loc+3])<<24
+	// v := b.view.Call("getUint32", b.loc, js.InternalObject(true)).Int()
 	b.loc += 4
-	return uint32(v), nil
+	return v
 }
 
-func (b *Buffer) ReadInt32() (int32, error) {
-	if len(b.buf) < int(b.loc+4) {
-		return 0, io.EOF
-	}
-	v := b.view.Call("getUint32", b.loc, js.InternalObject(true)).Int()
-	b.loc += 4
-	return int32(v), nil
+func (b *Buffer) ReadInt32() int32 {
+	return int32(b.ReadUint32())
 }
 
 // ReadRune returns a single rune from the buffer
-func (b *Buffer) ReadRune() (rune, error) {
+func (b *Buffer) ReadRune() rune {
 	return b.ReadInt32()
 }
 
-func (b *Buffer) ReadInt() (int, error) {
-	v, err := b.ReadInt32()
-	return int(v), err
+func (b *Buffer) ReadInt() int {
+	return int(b.ReadInt32())
 }
 
-func (b *Buffer) ReadUint64() (uint64, error) {
+func (b *Buffer) ReadUint64() uint64 {
+	if b.Err != nil {
+		return 0
+	}
+
 	if len(b.buf) < int(b.loc+8) {
-		return 0, io.EOF
+		b.Err = io.EOF
+		return 0
 	}
 	new64 := uint64(0)
 	js.InternalObject(new64).Set("$low", b.view.Call("getUint32", b.loc, true).Int())
 	js.InternalObject(new64).Set("$high", b.view.Call("getUint32", b.loc+4, true).Int())
 	b.loc += 8
-	return new64, nil
+	return new64
 }
 
-func (b *Buffer) ReadInt64() (int64, error) {
-	v, err := b.ReadUint64()
-	return int64(v), err
+func (b *Buffer) ReadInt64() int64 {
+	return int64(b.ReadUint64())
 }
 
-func (b *Buffer) ReadFloat64() (float64, error) {
+func (b *Buffer) ReadFloat64() float64 {
+	if b.Err != nil {
+		return 0
+	}
 	if len(b.buf) < int(b.loc+8) {
-		return 0, io.EOF
+		b.Err = io.EOF
+		return 0
 	}
 	v := b.view.Call("getFloat64", b.loc, true).Float()
 	b.loc += 8
-	return v, nil
+	return v
 }
 
-func (b *Buffer) ReadString() (string, error) {
-	l, err := b.ReadUint32()
-	if err != nil {
-		return "", err
-	}
-	if len(b.buf) < int(b.loc+l) {
-		return "", io.EOF
-	}
-	v := string(b.buf[b.loc : b.loc+l])
-	b.loc += l
-	return v, err
+func (b *Buffer) ReadString() string {
+	return string(b.readByteSlice(b.ReadUint32()))
 }
 
-func (b *Buffer) ReadByteSlice() ([]byte, error) {
-	l, err := b.ReadUint32()
-	if err != nil {
-		return nil, err
-	}
-	return b.readByteSlice(l)
+func (b *Buffer) ReadByteSlice() []byte {
+	return b.readByteSlice(b.ReadUint32())
 }
 
-func (b *Buffer) readByteSlice(length uint32) ([]byte, error) {
+func (b *Buffer) readByteSlice(length uint32) []byte {
+	if b.Err != nil {
+		return nil
+	}
 	if len(b.buf) < int(b.loc+length) {
-		return nil, io.EOF
+		b.Err = io.EOF
+		return nil
 	}
 	v := make([]byte, length)
 	copy(v, b.buf[b.loc:b.loc+length])
 	b.loc += length
-	return v, nil
+	return v
 }
 
-func (b *Buffer) ReadInt32Slice() ([]int32, error) {
-	return nil, io.EOF
+// func (b *Buffer) ReadInt32Slice() ([]int32, error) {
+// 	return nil, io.EOF
+// }
+
+func (b *Buffer) WriteByte(v byte) {
+	if b.Err != nil {
+		return
+	}
+	if len(b.buf) < int(b.loc+1) {
+		b.Err = io.EOF
+		return
+	}
+	b.buf[b.loc] = v
+	b.loc++
+	return
+}
+
+func (b *Buffer) WriteUint16(v uint16) {
+	if b.Err != nil {
+		return
+	}
+	if len(b.buf) < int(b.loc+2) {
+		b.Err = io.EOF
+		return
+	}
+	_ = b.buf[b.loc+1] // early bounds check to guarantee safety of writes below
+	b.buf[b.loc] = byte(v)
+	b.buf[b.loc+1] = byte(v >> 8)
+	b.loc += 2
+}
+
+func (b *Buffer) WriteInt16(v int16) {
+	b.WriteUint16(uint16(v))
+}
+
+func (b *Buffer) WriteUint32(v uint32) {
+	if b.Err != nil {
+		return
+	}
+	if len(b.buf) < int(b.loc+4) {
+		b.Err = io.EOF
+		return
+	}
+	_ = b.buf[b.loc+3] // early bounds check to guarantee safety of writes below
+	b.buf[b.loc] = byte(v)
+	b.buf[b.loc+1] = byte(v >> 8)
+	b.buf[b.loc+2] = byte(v >> 16)
+	b.buf[b.loc+3] = byte(v >> 24)
+	b.loc += 4
+	return
+}
+
+func (b *Buffer) WriteInt32(v int32) {
+	b.WriteUint32(uint32(v))
+}
+
+func (b *Buffer) WriteRune(v rune) {
+	b.WriteUint32(uint32(v))
+}
+
+// WriteInt writes an int as int32
+func (b *Buffer) WriteInt(v int) {
+	b.WriteInt32(int32(v))
+}
+
+func (b *Buffer) WriteUint64(v uint64) {
+	if b.Err != nil {
+		return
+	}
+	if len(b.buf) < int(b.loc+8) {
+		b.Err = io.EOF
+		return
+	}
+	iv := js.InternalObject(v)
+	// TODO: what if this doesnt align with the 4 bytes?
+	b.view.Call("setUint32", b.loc, iv.Get("$low").Int(), true)
+	b.view.Call("setUint32", b.loc+4, iv.Get("$high").Int(), true)
+	b.loc += 8
+	return
+}
+
+func (b *Buffer) WriteInt64(v int64) {
+	b.WriteUint64(uint64(v))
+}
+
+func (b *Buffer) WriteFloat64(v float64) {
+	if b.Err != nil {
+		return
+	}
+	if len(b.buf) < int(b.loc+8) {
+		b.Err = io.EOF
+		return
+	}
+	b.view.Call("setFloat64", b.loc, v, true)
+	b.loc += 8
+}
+
+func (b *Buffer) WriteString(v string) {
+	b.WriteByteSlice([]byte(v))
+}
+
+func (b *Buffer) WriteByteSlice(v []byte) {
+	b.WriteUint32(uint32(len(v)))
+	b.writeByteSlice(v)
+}
+
+func (b *Buffer) writeByteSlice(v []byte) {
+	if b.Err != nil {
+		return
+	}
+	l := len(v)
+	if l == 0 {
+		return
+	}
+	if len(b.buf) < int(b.loc)+l {
+		b.Err = io.EOF
+		return
+	}
+	copy(b.buf[b.loc:], v)
+	b.loc += uint32(l)
 }
