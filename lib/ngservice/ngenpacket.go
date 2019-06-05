@@ -51,9 +51,9 @@ func ReadPacket(ctx *ngen.Context, rawBytes []byte) (packet Packet, ok bool) {
 }
 
 // WriteMessage turns a message into byte slice for writing to network
-func WriteMessage(ctx *ngen.Context, msg ngen.Message) []byte {
-	bytes := make([]byte, ctx.Length(ctx, msg)+headerLen)
-	writeHeader(Header{MsgType: msg.MsgType(), ContentLength: uint16(len(bytes))}, bytes)
-	ctx.Write(ctx, msg, ngen.NewBuffer(bytes[headerLen:]))
-	return bytes
-}
+// func WriteMessage(ctx *ngen.Context, msg ngen.Message) []byte {
+// 	bytes := make([]byte, ctx.Length(ctx, msg)+headerLen)
+// 	writeHeader(Header{MsgType: msg.MsgType(), ContentLength: uint16(len(bytes))}, bytes)
+// 	ctx.Write(ctx, msg, ngen.NewBuffer(bytes[headerLen:]))
+// 	return bytes
+// }

@@ -4,9 +4,7 @@ package ngen
 type MessageType uint32
 
 // Message is a single message that can be serialized and setn
-type Message interface {
-	MsgType() MessageType
-}
+type Message interface{}
 
 // Writer is a function that accepts a context and a message and then serializes to the given buffer.
 type Writer func(*Context, Message, *Buffer) error

@@ -31,14 +31,15 @@ type EnumValue struct {
 
 // MessageField is a single field of a message.
 type MessageField struct {
-	Name      string
-	Type      string
-	Array     bool
-	Pointer   bool
-	Order     int
-	Size      int
-	Embedded  bool
-	Interface bool // used only for generating from existing interfaces
+	Name          string
+	Type          string
+	RemotePackage string
+	Array         bool
+	Pointer       bool
+	Order         int
+	Size          int
+	Embedded      bool
+	Interface     bool // used only for generating from existing interfaces
 }
 
 // Allowed types to generate from

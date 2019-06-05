@@ -69,7 +69,6 @@ func main() {
 
 	var parseFile func(f *ast.File, pkg *parsedPkg)
 	parseFile = func(f *ast.File, pkg *parsedPkg) {
-		log.Printf("Parsing file: %s", f.Name.Name)
 		for _, decl := range f.Decls {
 			switch d := decl.(type) {
 			case *ast.GenDecl:
@@ -83,7 +82,8 @@ func main() {
 						switch tsType := ts.Type.(type) {
 						case *ast.StructType:
 							msg := generate.Message{
-								Name: ts.Name.Name,
+								Name:    ts.Name.Name,
+								Package: pkg.name,
 							}
 							log.Printf("Looking at struct: %#v", ts.Name)
 							var fields []generate.MessageField
@@ -125,14 +125,16 @@ func main() {
 								}
 								size := 0
 								pkgSel, identType, isArray, isPointer := getidenttype(tfi.Type, false, false)
-								log.Printf("Looking at field: %s, %s", pkgSel, identType)
+								// log.Printf("Looking at field: %s, %s", pkgSel, identType)
 								if identType == nil {
 									// this means we don't handle this field type
 									continue
 								}
 								typeval := identType.Name
+								rp := ""
 								if pkgSel != nil {
 									typeval = pkgSel.Name + "." + typeval
+									rp = pkgSel.Name
 								}
 								if emb {
 									name = typeval
@@ -151,23 +153,20 @@ func main() {
 									msg.Versioned = true
 								}
 								fields = append(fields, generate.MessageField{
-									Name:      name,
-									Type:      typeval,
-									Array:     isArray,
-									Pointer:   isPointer,
-									Order:     customOrder,
-									Size:      size,
-									Embedded:  emb,
-									Interface: isInterface,
+									Name:          name,
+									RemotePackage: rp,
+									Type:          typeval,
+									Array:         isArray,
+									Pointer:       isPointer,
+									Order:         customOrder,
+									Size:          size,
+									Embedded:      emb,
+									Interface:     isInterface,
 								})
 							}
 							msg.Fields = fields
 							pkg.messages = append(pkg.messages, msg)
-							if msg.Package != pkg.name {
-								pkg.messageMap[msg.Package+"."+msg.Name] = msg
-							} else {
-								pkg.messageMap[msg.Name] = msg
-							}
+							pkg.messageMap[msg.Package+"."+msg.Name] = msg
 							fmt.Printf("Added message type %s\n", msg.Name)
 						case *ast.InterfaceType:
 							// skip - no need to handle this i think
@@ -226,7 +225,19 @@ func main() {
 	var parsePkg func(pkg *build.Package)
 	parsePkg = func(pkg *build.Package) {
 		log.Printf("Parsing Package: %s", pkg.Name)
+
+		pkgs[pkg.Name] = &parsedPkg{
+			name:       pkg.Name,
+			pkg:        pkg,
+			messages:   []generate.Message{},
+			enums:      []generate.Enum{},
+			messageMap: map[string]generate.Message{},
+			enumMap:    map[string]generate.Enum{},
+		}
+
+		// Parse imports first
 		for _, impt := range pkg.Imports {
+			log.Printf("Checking for import: %s", impt)
 			if _, ok := pkgs[impt]; ok {
 				continue
 			}
@@ -235,51 +246,50 @@ func main() {
 				log.Fatalf("Failed to import: %s", err)
 			}
 			parsePkg(importedPkg)
+		}
 
-			pkgs[impt] = &parsedPkg{
-				pkg:        importedPkg,
-				messages:   []generate.Message{},
-				enums:      []generate.Enum{},
-				messageMap: map[string]generate.Message{},
-				enumMap:    map[string]generate.Enum{},
+		// Now parse this package's files
+		for _, fname := range pkg.GoFiles {
+			if !filepath.IsAbs(fname) { // name might be absolute if specified directly. E.g., `gopherjs build /abs/file.go`.
+				fname = filepath.Join(pkg.Dir, fname)
 			}
-
-			for _, fname := range importedPkg.GoFiles {
-				if !filepath.IsAbs(fname) { // name might be absolute if specified directly. E.g., `gopherjs build /abs/file.go`.
-					fname = filepath.Join(importedPkg.Dir, fname)
-				}
-				r, err := buildutil.OpenFile(bc, fname)
-				if err != nil {
-					panic(err)
-				}
-				file, err := parser.ParseFile(fset, fname, r, parser.ParseComments)
-				if err != nil {
-					panic(err)
-				}
-				r.Close()
-				pkgs[impt].files = append(pkgs[impt].files, file)
-				parseFile(file, pkgs[impt])
+			r, err := buildutil.OpenFile(bc, fname)
+			if err != nil {
+				panic(err)
 			}
+			file, err := parser.ParseFile(fset, fname, r, parser.ParseComments)
+			if err != nil {
+				panic(err)
+			}
+			r.Close()
+			parseFile(file, pkgs[pkg.Name])
 		}
 	}
 
 	parsePkg(pkg)
 
-	// for _, fname := range pkg.GoFiles {
-	// 	if !filepath.IsAbs(fname) { // name might be absolute if specified directly. E.g., `gopherjs build /abs/file.go`.
-	// 		fname = filepath.Join(pkg.Dir, fname)
-	// 	}
-	// 	r, err := buildutil.OpenFile(bc, fname)
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// 	file, err := parser.ParseFile(fset, fname, r, parser.ParseComments)
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// 	r.Close()
-	// 	parseFile(file, pkgs[])
-	// }
+	msgs := []generate.Message{}
+	msgMap := map[string]generate.Message{}
+	enums := []generate.Enum{}
+	enumMap := map[string]generate.Enum{}
+
+	var addMsg func(name string, pkg *parsedPkg)
+
+	addMsg = func(name string, pkg *parsedPkg) {
+		log.Printf("Trying to add message: %s (pkg: %s)", name, pkg.name)
+		if msg, ok := pkg.messageMap[pkg.name+"."+name]; ok {
+			msgs = append(msgs, msg)
+			for _, f := range msg.Fields {
+				if f.RemotePackage != "" {
+					addMsg(f.Type, pkgs[f.RemotePackage])
+				}
+			}
+		}
+	}
+
+	for _, msg := range pkgs[pkg.Name].messages {
+		addMsg(msg.Name, pkgs[pkg.Name])
+	}
 
 	// TODO: Validate that we are correctly using versioning
 	// for _, msg := range messages {
@@ -302,11 +312,6 @@ func main() {
 		outdir = dir
 	}
 
-	msgs := []generate.Message{}
-	msgMap := map[string]generate.Message{}
-	enums := []generate.Enum{}
-	enumMap := map[string]generate.Enum{}
-
 	for _, l := range strings.Split(*genlist, ",") {
 		switch l {
 		case "go":
@@ -314,18 +319,23 @@ func main() {
 			buf := &bytes.Buffer{}
 			buf.WriteString(generate.GoLibHeader(outpkg, msgs, msgMap, enums, enumMap))
 
-			// for _, msg := range messages {
-			// 	buf.WriteString(generate.GoDeserializers(msg, pkg.messages, pkg.messageMap, pkg.enums, pkg.enumMap))
-			// }
+			for _, msg := range msgs {
+				buf.WriteString(generate.GoDeserializers(msg, msgs, msgMap, enums, enumMap))
+			}
 
-			ioutil.WriteFile(filepath.Join(filepath.Join(wd, *outdir), "ngenDeserial.go"), buf.Bytes(), 0644)
+			dir := filepath.Join(wd, *outdir)
+			os.MkdirAll(dir, 0644)
+			log.Printf("Writing file: %s", filepath.Join(dir, "ngenDeserial.go"))
+			log.Printf("Contents: %s", string(buf.Bytes()))
+			ioutil.WriteFile(filepath.Join(dir, "ngenDeserial.go"), buf.Bytes(), 0644)
 
 			buf.Reset()
-			buf.WriteString(fmt.Sprintf("%spackage %s\n\nimport \"github.com/lologarithm/netgen/lib/ngen\"", generate.HeaderComment(), pkg.Name))
-			// for _, msg := range messages {
-			// 	buf.WriteString(generate.GoSerializers(msg, pkg.messages, pkg.messageMap, pkg.enums, pkg.enumMap))
-			// }
-			ioutil.WriteFile(filepath.Join(pkgpath, "ngenSerial.go"), buf.Bytes(), 0644)
+			buf.WriteString(fmt.Sprintf("%s\npackage %s\n\nimport \"github.com/lologarithm/netgen/lib/ngen\"", generate.HeaderComment(), outpkg))
+			for _, msg := range msgs {
+				buf.WriteString(generate.GoSerializers(msg, msgs, msgMap, enums, enumMap))
+			}
+			log.Printf("Writing file: %s", filepath.Join(dir, "ngenSerial.go"))
+			ioutil.WriteFile(filepath.Join(dir, "ngenSerial.go"), buf.Bytes(), 0644)
 		case "js":
 			jsfile := generate.WriteJSConverter(pkg.Name, msgs, msgMap, enums, enumMap)
 			rootpkg := filepath.Join(wd, *outdir)
@@ -342,7 +352,6 @@ func main() {
 //  isArray
 //  isPointer
 func getidenttype(e ast.Expr, isArray bool, isPointer bool) (*ast.Ident, *ast.Ident, bool, bool) {
-	log.Printf("GetIdent: %#v", e)
 	switch itf := e.(type) {
 	case *ast.Ident:
 		return nil, itf, isArray, isPointer
