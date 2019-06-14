@@ -65,7 +65,7 @@ func main() {
 		messageMap map[string]generate.Message
 		enumMap    map[string]generate.Enum
 	}
-	pkgs := map[string]*parsedPkg{}
+	pkgs := map[string]*parsedPkg{"github.com/lologarithm/netgen/lib/ngen": &parsedPkg{}}
 
 	var parseFile func(f *ast.File, pkg *parsedPkg)
 	parseFile = func(f *ast.File, pkg *parsedPkg) {
@@ -131,7 +131,7 @@ func main() {
 									continue
 								}
 								typeval := identType.Name
-								rp := ""
+								rp := "" // pkg.name
 								if pkgSel != nil {
 									typeval = pkgSel.Name + "." + typeval
 									rp = pkgSel.Name
@@ -237,7 +237,6 @@ func main() {
 
 		// Parse imports first
 		for _, impt := range pkg.Imports {
-			log.Printf("Checking for import: %s", impt)
 			if _, ok := pkgs[impt]; ok {
 				continue
 			}
@@ -268,29 +267,6 @@ func main() {
 
 	parsePkg(pkg)
 
-	msgs := []generate.Message{}
-	msgMap := map[string]generate.Message{}
-	enums := []generate.Enum{}
-	enumMap := map[string]generate.Enum{}
-
-	var addMsg func(name string, pkg *parsedPkg)
-
-	addMsg = func(name string, pkg *parsedPkg) {
-		log.Printf("Trying to add message: %s (pkg: %s)", name, pkg.name)
-		if msg, ok := pkg.messageMap[pkg.name+"."+name]; ok {
-			msgs = append(msgs, msg)
-			for _, f := range msg.Fields {
-				if f.RemotePackage != "" {
-					addMsg(f.Type, pkgs[f.RemotePackage])
-				}
-			}
-		}
-	}
-
-	for _, msg := range pkgs[pkg.Name].messages {
-		addMsg(msg.Name, pkgs[pkg.Name])
-	}
-
 	// TODO: Validate that we are correctly using versioning
 	// for _, msg := range messages {
 	// 	if !msg.Versioned {
@@ -308,41 +284,46 @@ func main() {
 	// 	}
 	// }
 
-	if outdir == nil || *outdir == "" {
-		outdir = dir
-	}
-
 	for _, l := range strings.Split(*genlist, ",") {
-		switch l {
-		case "go":
-			outpkg := filepath.Base(*outdir)
-			buf := &bytes.Buffer{}
-			buf.WriteString(generate.GoLibHeader(outpkg, msgs, msgMap, enums, enumMap))
-
-			for _, msg := range msgs {
-				buf.WriteString(generate.GoDeserializers(msg, msgs, msgMap, enums, enumMap))
+		for name, pkg := range pkgs {
+			if pkg.pkg == nil {
+				continue
 			}
-
-			dir := filepath.Join(wd, *outdir)
-			os.MkdirAll(dir, 0644)
-			log.Printf("Writing file: %s", filepath.Join(dir, "ngenDeserial.go"))
-			log.Printf("Contents: %s", string(buf.Bytes()))
-			ioutil.WriteFile(filepath.Join(dir, "ngenDeserial.go"), buf.Bytes(), 0644)
-
-			buf.Reset()
-			buf.WriteString(fmt.Sprintf("%s\npackage %s\n\nimport \"github.com/lologarithm/netgen/lib/ngen\"", generate.HeaderComment(), outpkg))
-			for _, msg := range msgs {
-				buf.WriteString(generate.GoSerializers(msg, msgs, msgMap, enums, enumMap))
+			pkgdir := *outdir
+			if pkgdir == "" {
+				pkgdir = pkg.pkg.Dir
+			} else if pkgdir[0] == '.' {
+				pkgdir = filepath.Join(wd, pkgdir)
 			}
-			log.Printf("Writing file: %s", filepath.Join(dir, "ngenSerial.go"))
-			ioutil.WriteFile(filepath.Join(dir, "ngenSerial.go"), buf.Bytes(), 0644)
-		case "js":
-			jsfile := generate.WriteJSConverter(pkg.Name, msgs, msgMap, enums, enumMap)
-			rootpkg := filepath.Join(wd, *outdir)
-			ioutil.WriteFile(path.Join(rootpkg, "ngenjs.go"), jsfile, 0666)
+			log.Printf("Now writing package: '%s' at '%s'", name, pkgdir)
+			switch l {
+			case "go":
+				outpkg := pkg.name
+				buf := &bytes.Buffer{}
+				buf.WriteString(generate.GoLibHeader(outpkg, pkg.messages, pkg.messageMap, pkg.enums, pkg.enumMap))
 
-		case "cs":
-			// generate.WriteCS(messages, messageMap)
+				for _, msg := range pkg.messages {
+					buf.WriteString(generate.GoDeserializers(msg, pkg.messages, pkg.messageMap, pkg.enums, pkg.enumMap))
+				}
+
+				log.Printf("Writing file: %s", filepath.Join(pkgdir, "ngenDeserial.go"))
+				// log.Printf("Contents: %s", string(buf.Bytes()))
+				ioutil.WriteFile(filepath.Join(pkgdir, "ngenDeserial.go"), buf.Bytes(), 0644)
+
+				buf.Reset()
+				buf.WriteString(fmt.Sprintf("%s\npackage %s\n\nimport \"github.com/lologarithm/netgen/lib/ngen\"", generate.HeaderComment(), outpkg))
+				for _, msg := range pkg.messages {
+					buf.WriteString(generate.GoSerializers(msg, pkg.messages, pkg.messageMap, pkg.enums, pkg.enumMap))
+				}
+				log.Printf("Writing file: %s", filepath.Join(pkgdir, "ngenSerial.go"))
+				ioutil.WriteFile(filepath.Join(pkgdir, "ngenSerial.go"), buf.Bytes(), 0644)
+			case "js":
+				jsfile := generate.WriteJSConverter(pkg.name, pkg.messages, pkg.messageMap, pkg.enums, pkg.enumMap)
+				rootpkg := filepath.Join(wd, *outdir)
+				ioutil.WriteFile(path.Join(rootpkg, "ngenjs.go"), jsfile, 0666)
+			case "cs":
+				// generate.WriteCS(messages, messageMap)
+			}
 		}
 	}
 }

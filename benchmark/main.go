@@ -14,3 +14,12 @@ func main() {
 	print(m)
 	// stub so gopherjs stops whining
 }
+
+type Benchy struct {
+	Name     string
+	BirthDay int64
+	Phone    string
+	Siblings int32
+	Spouse   byte
+	Money    float64
+}

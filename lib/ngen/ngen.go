@@ -4,23 +4,20 @@ package ngen
 type MessageType uint32
 
 // Message is a single message that can be serialized and setn
-type Message interface{}
-
-// Writer is a function that accepts a context and a message and then serializes to the given buffer.
-type Writer func(*Context, Message, *Buffer) error
+type Message interface {
+	MsgType() MessageType
+	Serialize(*Context, *Buffer) error // Writes the serialized message to the given buffer
+	// Deserialize(*Context, *Buffer) error // Deserializes the given buffer into this object instance. Requires that the message type matches the underlying struct
+	Length(*Context) int // Returns the size of the object. Used by serialize to pre-allocate a buffer.
+}
 
 // Reader takes a context and message type and deserializes a message from the given buffer.
 type Reader func(*Context, MessageType, *Buffer) Message
 
-// Lengther returns the length of the given message for allocating sizes.
-type Lengther func(*Context, Message) int
-
 // Context represents serialization settings
 // The current main use for this is to exchange versions of objects.
 type Context struct {
-	Write  Writer
-	Read   Reader
-	Length Lengther
+	Read Reader
 
 	FieldVersions map[MessageType][]byte
 
@@ -38,23 +35,19 @@ func (v Context) MsgType() MessageType {
 }
 
 // Serialize will convert the settings to a byte slice
-func (v Context) Serialize() []byte {
-	buffer := make([]byte, v.length())
-	i := 4
-	PutUint32(buffer, uint32(len(v.FieldVersions)))
+func (v Context) Serialize(_ *Context, buf *Buffer) error {
+	buf.WriteUint32(uint32(len(v.FieldVersions)))
 	for k, fv := range v.FieldVersions {
-		PutUint32(buffer[i:], uint32(k))
-		i += 4
-		buffer[i] = byte(len(fv))
-		i++
-		copy(buffer[i:], fv)
-		i += len(fv)
+		buf.WriteUint32(uint32(k))
+		l := len(fv)
+		buf.WriteByte(byte(l)) // write len as byte to keep msg small
+		buf.writeByteSlice(fv)
 	}
-	return buffer
+	return buf.Err
 }
 
-// Len returns
-func (v Context) length() int {
+// Length returns length of this message
+func (v Context) Length(_ *Context) int {
 	total := 4
 	for _, fv := range v.FieldVersions {
 		total += 5 + len(fv) // Field key (4) + field length (1) + field values (len of array)
@@ -62,13 +55,16 @@ func (v Context) length() int {
 	return total
 }
 
+func (c *Context) Deserialize(ctx *Context, buf *Buffer) error {
+	*c = *DeserializeContext(ctx, buf)
+	return nil
+}
+
 // DeserializeContext constructs a new Context from the binary data.
 // Requires the existing context to clone reader/writer functions.
 func DeserializeContext(ctx *Context, b *Buffer) *Context {
 	s := &Context{
-		Read:   ctx.Read,
-		Write:  ctx.Write,
-		Length: ctx.Length,
+		Read: ctx.Read,
 	}
 	num := b.ReadInt()
 	s.FieldVersions = make(map[MessageType][]byte, num)

@@ -33,6 +33,7 @@ type EnumValue struct {
 type MessageField struct {
 	Name          string
 	Type          string
+	MsgType       *Message
 	RemotePackage string
 	Array         bool
 	Pointer       bool

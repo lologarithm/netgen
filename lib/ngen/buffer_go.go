@@ -24,6 +24,20 @@ func (b *Buffer) Reset() {
 
 // READ FUNCS
 
+// ReadBool will read next byte from buffer and increment read location
+func (b *Buffer) ReadBool() bool {
+	if b.Err != nil {
+		return false
+	}
+	if len(b.Buf) < int(b.Loc+1) {
+		b.Err = io.EOF
+		return false
+	}
+	v := b.Buf[b.Loc] == 1
+	b.Loc++
+	return v
+}
+
 // ReadByte will read next byte from buffer and increment read location
 func (b *Buffer) ReadByte() byte {
 	if b.Err != nil {
@@ -174,6 +188,23 @@ func (b *Buffer) readByteSlice(length uint32) []byte {
 // }
 
 // WRITE FUNCS
+
+func (b *Buffer) WriteBool(v bool) {
+	if b.Err != nil {
+		return
+	}
+	if len(b.Buf) < int(b.Loc+1) {
+		b.Err = io.EOF
+		return
+	}
+	if v {
+		b.Buf[b.Loc] = 1
+	} else {
+		b.Buf[b.Loc] = 0
+	}
+	b.Loc++
+	return
+}
 
 func (b *Buffer) WriteByte(v byte) {
 	if b.Err != nil {
