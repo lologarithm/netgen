@@ -131,9 +131,9 @@ func main() {
 									continue
 								}
 								typeval := identType.Name
-								rp := "" // pkg.name
+								rp := "" // remote package name
 								if pkgSel != nil {
-									typeval = pkgSel.Name + "." + typeval
+									// typeval = pkgSel.Name + "." + typeval
 									rp = pkgSel.Name
 								}
 								if emb {
@@ -166,8 +166,8 @@ func main() {
 							}
 							msg.Fields = fields
 							pkg.messages = append(pkg.messages, msg)
-							pkg.messageMap[msg.Package+"."+msg.Name] = msg
-							fmt.Printf("Added message type %s\n", msg.Name)
+							pkg.messageMap[msg.Name] = msg
+							// fmt.Printf("Added message type %s\n", msg.Name)
 						case *ast.InterfaceType:
 							// skip - no need to handle this i think
 						case *ast.Ident:
@@ -263,6 +263,8 @@ func main() {
 			r.Close()
 			parseFile(file, pkgs[pkg.Name])
 		}
+
+		// TODO: walk through local types and assign the messagefield pointers.
 	}
 
 	parsePkg(pkg)

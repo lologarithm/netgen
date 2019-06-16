@@ -17,7 +17,17 @@ func HeaderComment() string {
 }
 
 func goName(m Message) string {
-	return m.Package + "." + m.Name
+	if len(m.Package) > 0 {
+		return m.Package + "." + m.Name
+	}
+	return m.Name
+}
+
+func goFieldName(m MessageField) string {
+	if len(m.RemotePackage) > 0 {
+		return m.RemotePackage + "." + m.Type
+	}
+	return m.Type
 }
 
 // GoLibHeader will return all the bits needed to make the generated serializers/deserializers work
@@ -189,7 +199,7 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 	case StringType:
 		buf.WriteString(fmt.Sprintf("mylen += 4 + len(%s)", n))
 	default:
-		if _, ok := messages[f.RemotePackage+"."+f.Name]; ok || f.Interface {
+		if _, ok := messages[goFieldName(f)]; ok || f.Interface {
 			if f.Pointer || f.Interface {
 				buf.WriteString("\n")
 				writeTabScope(buf, scopeDepth)
@@ -202,16 +212,16 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer, messages map[
 					writeTabScope(buf, scopeDepth)
 				}
 			}
-			buf.WriteString(fmt.Sprintf("mylen += %s.Length()", n))
+			buf.WriteString(fmt.Sprintf("mylen += %s.Length(ctx)", n))
 			if f.Pointer || f.Interface {
 				buf.WriteString("\n")
 				writeTabScope(buf, scopeDepth)
 				buf.WriteString("}")
 			}
-		} else if _, ok := enums[f.Type]; ok {
+		} else if _, ok := enums[goFieldName(f)]; ok {
 			buf.WriteString("mylen += 4 // enums are always int32... for now")
 		} else {
-			fmt.Printf("Can't write len for an unknown type... %#v\n", f)
+			fmt.Printf("Can't write len for an unknown type... %#v\nMessage Type Map:\n%#v\n", f, messages)
 		}
 	}
 	buf.WriteString("\n")
@@ -222,7 +232,7 @@ func writeArrayLen(f MessageField, scopeDepth int, buf *bytes.Buffer) {
 	if scopeDepth == 1 {
 		name = "m." + name
 	}
-	buf.WriteString(fmt.Sprintf("buffer.PutUint32(uint32(%s.Length()))\n", name))
+	buf.WriteString(fmt.Sprintf("buffer.WriteUint32(uint32(len(%s)))\n", name))
 	writeTabScope(buf, scopeDepth)
 }
 
@@ -267,7 +277,7 @@ func WriteGoSerializeField(f MessageField, scopeDepth int, buf *bytes.Buffer, me
 	case StringType:
 		buf.WriteString(fmt.Sprintf("buffer.WriteString(%s)\n", n))
 	default:
-		if _, ok := messages[f.Type]; ok || f.Interface {
+		if _, ok := messages[goFieldName(f)]; ok || f.Interface {
 			varname := f.Name
 			// Custom message deserial here.
 			if scopeDepth == 1 {
@@ -291,7 +301,7 @@ func WriteGoSerializeField(f MessageField, scopeDepth int, buf *bytes.Buffer, me
 				buf.WriteString(fmt.Sprintf("%s.Serialize(ctx, buffer)\n%s", varname, tabString))
 			}
 		} else if _, ok := enums[f.Type]; ok {
-			buf.WriteString(fmt.Sprintf("buffer.PutUint32(uint32(%s))\n", n))
+			buf.WriteString(fmt.Sprintf("buffer.WriteUint32(uint32(%s))\n", n))
 			writeTabScope(buf, scopeDepth)
 		} else {
 			buf.WriteString(fmt.Sprintf("%s.Serialize(ctx, buffer)\n%s", n, tabString))
@@ -362,7 +372,7 @@ func WriteGoDeserialField(f MessageField, includeM bool, scopeDepth int, buf *by
 			return
 		}
 
-		if _, ok := messages[f.Type]; ok {
+		if _, ok := messages[goFieldName(f)]; ok {
 			// Custom message deserial here.
 			if f.Pointer {
 				buf.WriteString("if v := buffer.ReadByte(); v == 1 {\n")
@@ -371,17 +381,13 @@ func WriteGoDeserialField(f MessageField, includeM bool, scopeDepth int, buf *by
 				if strings.Contains(f.Name, "[") {
 					subName = "subi"
 				}
-				buf.WriteString("\tvar ")
-				buf.WriteString(subName)
-				buf.WriteString(" = ")
-				buf.WriteString(f.Type)
-				buf.WriteString("Deserialize(ctx, buffer)\n")
+				pkg := ""
+				if f.RemotePackage != "" {
+					pkg = f.RemotePackage + "."
+				}
+				buf.WriteString(fmt.Sprintf("\tvar %s = %sDeserialize%s(ctx, buffer)\n", subName, pkg, f.Type))
 				writeTabScope(buf, scopeDepth)
-				buf.WriteString("\t")
-				buf.WriteString(n)
-				buf.WriteString(" = &")
-				buf.WriteString(subName)
-				buf.WriteString("\n")
+				buf.WriteString(fmt.Sprintf("\t%s = &%s\n", n, subName))
 				writeTabScope(buf, scopeDepth)
 				buf.WriteString("}\n")
 			} else {
@@ -390,7 +396,7 @@ func WriteGoDeserialField(f MessageField, includeM bool, scopeDepth int, buf *by
 				buf.WriteString(f.Type[0:])
 				buf.WriteString("Deserialize(ctx, buffer)\n")
 			}
-		} else if _, ok := enums[f.Type]; ok {
+		} else if _, ok := enums[goFieldName(f)]; ok {
 			name := "tmp" + f.Name
 			buf.WriteString(name)
 			buf.WriteString(" := buffer.ReadUint32()\n")
