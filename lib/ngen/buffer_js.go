@@ -109,6 +109,19 @@ func (b *Buffer) ReadInt64() int64 {
 	return int64(b.ReadUint64())
 }
 
+func (b *Buffer) ReadFloat32() float32 {
+	if b.Err != nil {
+		return 0
+	}
+	if len(b.buf) < int(b.loc+4) {
+		b.Err = io.EOF
+		return 0
+	}
+	v := b.view.Call("getFloat32", b.loc, true).Float()
+	b.loc += 4
+	return float32(v)
+}
+
 func (b *Buffer) ReadFloat64() float64 {
 	if b.Err != nil {
 		return 0
@@ -227,6 +240,18 @@ func (b *Buffer) WriteUint64(v uint64) {
 
 func (b *Buffer) WriteInt64(v int64) {
 	b.WriteUint64(uint64(v))
+}
+
+func (b *Buffer) WriteFloat32(v float32) {
+	if b.Err != nil {
+		return
+	}
+	if len(b.buf) < int(b.loc+4) {
+		b.Err = io.EOF
+		return
+	}
+	b.view.Call("setFloat32", b.loc, v, true)
+	b.loc += 4
 }
 
 func (b *Buffer) WriteFloat64(v float64) {

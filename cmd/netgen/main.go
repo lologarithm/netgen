@@ -56,19 +56,10 @@ func main() {
 		panic(err)
 	}
 
-	type parsedPkg struct {
-		name       string
-		pkg        *build.Package
-		files      []*ast.File
-		messages   []generate.Message
-		enums      []generate.Enum
-		messageMap map[string]generate.Message
-		enumMap    map[string]generate.Enum
-	}
-	pkgs := map[string]*parsedPkg{"github.com/lologarithm/netgen/lib/ngen": &parsedPkg{}}
+	pkgs := map[string]*generate.ParsedPkg{"github.com/lologarithm/netgen/lib/ngen": &generate.ParsedPkg{}}
 
-	var parseFile func(f *ast.File, pkg *parsedPkg)
-	parseFile = func(f *ast.File, pkg *parsedPkg) {
+	var parseFile func(f *ast.File, pkg *generate.ParsedPkg)
+	parseFile = func(f *ast.File, pkg *generate.ParsedPkg) {
 		for _, decl := range f.Decls {
 			switch d := decl.(type) {
 			case *ast.GenDecl:
@@ -83,9 +74,8 @@ func main() {
 						case *ast.StructType:
 							msg := generate.Message{
 								Name:    ts.Name.Name,
-								Package: pkg.name,
+								Package: pkg.Name,
 							}
-							log.Printf("Looking at struct: %#v", ts.Name)
 							var fields []generate.MessageField
 							for _, tfi := range tsType.Fields.List {
 								emb := false
@@ -165,21 +155,20 @@ func main() {
 								})
 							}
 							msg.Fields = fields
-							pkg.messages = append(pkg.messages, msg)
-							pkg.messageMap[msg.Name] = msg
+							pkg.Messages = append(pkg.Messages, msg)
+							pkg.MessageMap[msg.Name] = msg
 							// fmt.Printf("Added message type %s\n", msg.Name)
 						case *ast.InterfaceType:
 							// skip - no need to handle this i think
 						case *ast.Ident:
 							// this is a const type
 							if tsType.Name == "string" {
-								fmt.Printf("can't use const of type %s\n", tsType.Name)
 								break
 							}
 							enum := generate.Enum{Name: ts.Name.Name}
-							pkg.enums = append(pkg.enums, enum)
+							pkg.Enums = append(pkg.Enums, enum)
 							fmt.Printf("Added enum type %s\n", ts.Name.Name)
-							pkg.enumMap[ts.Name.Name] = enum
+							pkg.EnumMap[ts.Name.Name] = enum
 						default:
 							fmt.Printf("Unknown type lib declaration: %s, %v\n", reflect.TypeOf(ts.Type), ts.Type)
 						}
@@ -224,15 +213,19 @@ func main() {
 
 	var parsePkg func(pkg *build.Package)
 	parsePkg = func(pkg *build.Package) {
+		if _, ok := pkgs[pkg.Name]; ok {
+			return
+		}
+
 		log.Printf("Parsing Package: %s", pkg.Name)
 
-		pkgs[pkg.Name] = &parsedPkg{
-			name:       pkg.Name,
-			pkg:        pkg,
-			messages:   []generate.Message{},
-			enums:      []generate.Enum{},
-			messageMap: map[string]generate.Message{},
-			enumMap:    map[string]generate.Enum{},
+		pkgs[pkg.Name] = &generate.ParsedPkg{
+			Name:       pkg.Name,
+			Pkg:        pkg,
+			Messages:   []generate.Message{},
+			Enums:      []generate.Enum{},
+			MessageMap: map[string]generate.Message{},
+			EnumMap:    map[string]generate.Enum{},
 		}
 
 		// Parse imports first
@@ -243,6 +236,10 @@ func main() {
 			importedPkg, err := bc.Import(impt, pkgpath, 0)
 			if err != nil {
 				log.Fatalf("Failed to import: %s", err)
+			}
+			if importedPkg.Goroot {
+				// We wont write serializers into goroot.
+				continue
 			}
 			parsePkg(importedPkg)
 		}
@@ -286,41 +283,69 @@ func main() {
 	// 	}
 	// }
 
+	// msgs := map[string][]generate.Message{}
+
+	// msgqueue := make([]generate.Message, len(pkgs[pkg.Name].Messages))
+	// copy(msgqueue, pkgs[pkg.Name].Messages)
+
+	for _, pkg := range pkgs {
+		for _, msg := range pkg.Messages {
+			for i, mf := range msg.Fields {
+				fieldPkg := mf.RemotePackage
+				if fieldPkg == "" {
+					fieldPkg = msg.Package
+				}
+				opkg := pkgs[fieldPkg]
+				if opkg != nil {
+					omsg, hasMessage := opkg.MessageMap[mf.Type]
+					if hasMessage {
+						msg.Fields[i].MsgType = &omsg
+						continue
+					}
+					fmt.Printf("PostProcess, Msg: %s, Field: %s, Type: %s\n", msg.Name, mf.Name, mf.Type)
+					oen, ok := opkg.EnumMap[mf.Type]
+					if ok {
+						msg.Fields[i].EnumType = &oen
+						continue
+					}
+					fmt.Printf("\tCouldn't link %s to an enum or msg type...\n", mf.Name)
+				}
+			}
+		}
+	}
+
 	for _, l := range strings.Split(*genlist, ",") {
 		for name, pkg := range pkgs {
-			if pkg.pkg == nil {
+			if pkg.Pkg == nil {
 				continue
 			}
 			pkgdir := *outdir
 			if pkgdir == "" {
-				pkgdir = pkg.pkg.Dir
+				pkgdir = pkg.Pkg.Dir
 			} else if pkgdir[0] == '.' {
 				pkgdir = filepath.Join(wd, pkgdir)
 			}
 			log.Printf("Now writing package: '%s' at '%s'", name, pkgdir)
 			switch l {
 			case "go":
-				outpkg := pkg.name
 				buf := &bytes.Buffer{}
-				buf.WriteString(generate.GoLibHeader(outpkg, pkg.messages, pkg.messageMap, pkg.enums, pkg.enumMap))
+				buf.WriteString(generate.GoLibHeader(pkg))
 
-				for _, msg := range pkg.messages {
-					buf.WriteString(generate.GoDeserializers(msg, pkg.messages, pkg.messageMap, pkg.enums, pkg.enumMap))
+				for _, msg := range pkg.Messages {
+					fmt.Printf("Writing deserializers for %s.%s\n", pkg.Name, msg.Name)
+					buf.WriteString(generate.GoDeserializers(msg))
 				}
 
-				log.Printf("Writing file: %s", filepath.Join(pkgdir, "ngenDeserial.go"))
 				// log.Printf("Contents: %s", string(buf.Bytes()))
 				ioutil.WriteFile(filepath.Join(pkgdir, "ngenDeserial.go"), buf.Bytes(), 0644)
-
 				buf.Reset()
-				buf.WriteString(fmt.Sprintf("%s\npackage %s\n\nimport \"github.com/lologarithm/netgen/lib/ngen\"", generate.HeaderComment(), outpkg))
-				for _, msg := range pkg.messages {
-					buf.WriteString(generate.GoSerializers(msg, pkg.messages, pkg.messageMap, pkg.enums, pkg.enumMap))
+				buf.WriteString(fmt.Sprintf("%s\npackage %s\n\nimport \"github.com/lologarithm/netgen/lib/ngen\"", generate.HeaderComment(), pkg.Name))
+				for _, msg := range pkg.Messages {
+					buf.WriteString(generate.GoSerializers(msg))
 				}
-				log.Printf("Writing file: %s", filepath.Join(pkgdir, "ngenSerial.go"))
 				ioutil.WriteFile(filepath.Join(pkgdir, "ngenSerial.go"), buf.Bytes(), 0644)
 			case "js":
-				jsfile := generate.WriteJSConverter(pkg.name, pkg.messages, pkg.messageMap, pkg.enums, pkg.enumMap)
+				jsfile := generate.WriteJSConverter(pkg)
 				rootpkg := filepath.Join(wd, *outdir)
 				ioutil.WriteFile(path.Join(rootpkg, "ngenjs.go"), jsfile, 0666)
 			case "cs":

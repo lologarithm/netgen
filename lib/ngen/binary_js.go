@@ -52,11 +52,25 @@ func PutUint64(b []byte, v uint64) {
 	view.Call("setUint32", 4, iv.Get("$high").Int(), true)
 }
 
+func Float32(b []byte) float32 {
+	iba := js.InternalObject(b)
+	buf := iba.Get("$array").Get("buffer")
+	view := js.Global.Get("DataView").New(buf, iba.Get("$offset"), 8)
+	return view.Call("getFloat32", 0, true).Float()
+}
+
 func Float64(b []byte) float64 {
 	iba := js.InternalObject(b)
 	buf := iba.Get("$array").Get("buffer")
 	view := js.Global.Get("DataView").New(buf, iba.Get("$offset"), 8)
 	return view.Call("getFloat64", 0, true).Float()
+}
+
+func PutFloat32(b []byte, v float32) {
+	iba := js.InternalObject(b)
+	buf := iba.Get("$array").Get("buffer")
+	view := js.Global.Get("DataView").New(buf, iba.Get("$offset"), 8)
+	view.Call("setFloat32", 0, v, true)
 }
 
 func PutFloat64(b []byte, v float64) {

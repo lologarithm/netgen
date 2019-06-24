@@ -1,6 +1,20 @@
 package generate
 
-import "hash/crc32"
+import (
+	"go/ast"
+	"go/build"
+	"hash/crc32"
+)
+
+type ParsedPkg struct {
+	Name       string
+	Pkg        *build.Package
+	Files      []*ast.File
+	Messages   []Message
+	Enums      []Enum
+	MessageMap map[string]Message
+	EnumMap    map[string]Enum
+}
 
 // Message is a message that can be serialized across network.
 type Message struct {
@@ -34,6 +48,7 @@ type MessageField struct {
 	Name          string
 	Type          string
 	MsgType       *Message
+	EnumType      *Enum
 	RemotePackage string
 	Array         bool
 	Pointer       bool
@@ -56,5 +71,6 @@ const (
 	Uint32Type  string = "uint32"
 	Int64Type   string = "int64"
 	Uint64Type  string = "uint64"
+	Float32Type string = "float32"
 	Float64Type string = "float64"
 )

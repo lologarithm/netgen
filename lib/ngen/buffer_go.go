@@ -132,6 +132,19 @@ func (b *Buffer) ReadInt64() int64 {
 	return int64(v)
 }
 
+func (b *Buffer) ReadFloat32() float32 {
+	if b.Err != nil {
+		return 0
+	}
+	if len(b.Buf) < int(b.Loc+8) {
+		b.Err = io.EOF
+		return 0
+	}
+	v := Float32(b.Buf[b.Loc:])
+	b.Loc += 8
+	return v
+}
+
 func (b *Buffer) ReadFloat64() float64 {
 	if b.Err != nil {
 		return 0
@@ -290,6 +303,17 @@ func (b *Buffer) WriteUint64(v uint64) {
 
 func (b *Buffer) WriteInt64(v int64) {
 	b.WriteUint64(uint64(v))
+}
+
+func (b *Buffer) WriteFloat32(v float32) {
+	if b.Err != nil {
+		return
+	}
+	if len(b.Buf) < int(b.Loc+8) {
+		b.Err = io.EOF
+		return
+	}
+	b.WriteUint32(math.Float32bits(v))
 }
 
 func (b *Buffer) WriteFloat64(v float64) {
