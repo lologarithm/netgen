@@ -16,6 +16,12 @@ type Client struct {
 	Incoming chan ngen.Message
 }
 
+func ManageClient(ctx *ngen.Context, c *Client) {
+	settingsSync := make(chan *ngen.Context)
+	go Sender(c, ctx, settingsSync)
+	go Reader(c, ctx, settingsSync)
+}
+
 // Reader spawns a block for loop reading off the conn on Client
 // it will put all read packets onto the incoming channel.
 // This code requires the conn to not shard packets.
@@ -77,7 +83,7 @@ func Sender(c *Client, local *ngen.Context, remote chan *ngen.Context) {
 	if len(local.FieldVersions) > 0 {
 		// First message out is the settings (versioning info) for this instance.
 		// This will allow the other side to read our versioned structs.
-		n, err := c.Conn.Write(ngservice.WriteMessage(local, local))
+		n, err := c.Conn.Write(ngservice.WriteMessage(nil, local))
 		if err != nil || n == 0 {
 			fmt.Printf("Failed to write handshake settings with remote: %s", err.Error())
 			return

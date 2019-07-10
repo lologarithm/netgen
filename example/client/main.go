@@ -8,8 +8,8 @@ import (
 	"github.com/gopherjs/gopherjs/js"
 	"github.com/lologarithm/netgen/example/newmodels"
 	"github.com/lologarithm/netgen/lib/ngen"
-	"github.com/lologarithm/netgen/lib/ngen/service/client"
-	"github.com/lologarithm/netgen/lib/ngen/service/client/ngwebsocket"
+	"github.com/lologarithm/netgen/lib/ngservice/client"
+	"github.com/lologarithm/netgen/lib/ngservice/client/ngwebsocket"
 )
 
 func main() {
@@ -79,7 +79,7 @@ func (c *Client) Dial(url string) {
 			if c.CEvents != nil && c.CEvents.connected != nil {
 				c.CEvents.connected(true)
 			}
-			newmodels.ManageClient(c.Client)
+			client.ManageClient(c.Client)
 			go runClient(c)
 		})
 		if err != nil {

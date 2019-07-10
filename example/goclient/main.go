@@ -5,31 +5,31 @@ import (
 	"os"
 
 	"github.com/lologarithm/netgen/example/newmodels"
-	"github.com/lologarithm/netgen/lib/ngen"
-	"github.com/lologarithm/netgen/lib/ngen/service/client/ngwebsocket"
+	"github.com/lologarithm/netgen/lib/ngservice/client"
+	"github.com/lologarithm/netgen/lib/ngservice/client/ngwebsocket"
 )
 
 func main() {
 	url := "ws://127.0.0.1:4567/ws"
 	origin := "http://127.0.0.1/"
-	client, err := ngwebsocket.New(url, origin, func() {})
+	ngclient, err := ngwebsocket.New(url, origin, func() {})
 	if err != nil {
 		fmt.Printf("Failed to connect: %s\n", err.Error())
 		os.Exit(1)
 	}
 
-	newmodels.ManageClient(client)
-	client.Outgoing <- ngen.NewPacket(newmodels.Message{
+	client.ManageClient(newmodels.Context, ngclient)
+	ngclient.Outgoing <- newmodels.Message{
 		Message: "HELLOOOO",
-	})
+	}
 
-	for packet := range client.Incoming {
-		if packet == nil {
+	for msg := range ngclient.Incoming {
+		if msg == nil {
 			break
 		}
-		switch packet.Header.MsgType {
+		switch msg.MsgType() {
 		case newmodels.MessageMsgType:
-			fmt.Printf("Got message: %s\n", packet.NetMsg.(*newmodels.Message).Message)
+			fmt.Printf("Got message: %s\n", msg.(*newmodels.Message).Message)
 			os.Exit(0)
 		}
 	}

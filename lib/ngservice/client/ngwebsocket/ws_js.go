@@ -36,8 +36,8 @@ func New(url, _ string, onConnect func()) (*client.Client, error) {
 
 	return &client.Client{
 		Conn:     ws,
-		Outgoing: make(chan *ngen.Packet, 10),
-		Incoming: make(chan *ngen.Packet, 10),
+		Outgoing: make(chan ngen.Message, 10),
+		Incoming: make(chan ngen.Message, 10),
 	}, nil
 }
 

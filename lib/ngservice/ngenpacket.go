@@ -22,12 +22,6 @@ type Header struct {
 	ContentLength uint16           // byte 4-6, content length
 }
 
-// writeHeader will write header bytes to the given byte slice.
-func writeHeader(h Header, buf []byte) {
-	ngen.PutUint32(buf, uint32(h.MsgType))
-	ngen.PutUint16(buf[4:], h.ContentLength)
-}
-
 // parseHeader will parse the header off a byte array.
 func parseHeader(rawBytes []byte) (mf Header, ok bool) {
 	if len(rawBytes) < headerLen {
@@ -51,9 +45,11 @@ func ReadPacket(ctx *ngen.Context, rawBytes []byte) (packet Packet, ok bool) {
 }
 
 // WriteMessage turns a message into byte slice for writing to network
-// func WriteMessage(ctx *ngen.Context, msg ngen.Message) []byte {
-// 	bytes := make([]byte, ctx.Length(ctx, msg)+headerLen)
-// 	writeHeader(Header{MsgType: msg.MsgType(), ContentLength: uint16(len(bytes))}, bytes)
-// 	ctx.Write(ctx, msg, ngen.NewBuffer(bytes[headerLen:]))
-// 	return bytes
-// }
+func WriteMessage(ctx *ngen.Context, msg ngen.Message) []byte {
+	length := msg.Length(ctx) + headerLen
+	buf := ngen.NewBuffer(make([]byte, length))
+	buf.WriteUint32(uint32(msg.MsgType()))
+	buf.WriteUint16(uint16(length))
+	msg.Serialize(ctx, buf)
+	return buf.Buf
+}

@@ -57,15 +57,6 @@ func GoLibHeader(pkg *ParsedPkg) string {
 	}
 `, fldbuf.String()))
 
-	// TODO: Move this to ngservice package
-	// 	gobuf.WriteString(`
-	// func ManageClient(c *client.Client) {
-	// 	settingsSync := make(chan *ngen.Context)
-	// 	go client.Sender(c, Settings, settingsSync)
-	// 	go client.Reader(c, ParseNetMessage, settingsSync)
-	// }
-	// `)
-
 	// 1. List type values!
 	gobuf.WriteString("const (\n")
 	for _, t := range pkg.Messages {

@@ -56,7 +56,7 @@ func Float32(b []byte) float32 {
 	iba := js.InternalObject(b)
 	buf := iba.Get("$array").Get("buffer")
 	view := js.Global.Get("DataView").New(buf, iba.Get("$offset"), 8)
-	return view.Call("getFloat32", 0, true).Float()
+	return float32(view.Call("getFloat32", 0, true).Float())
 }
 
 func Float64(b []byte) float64 {
