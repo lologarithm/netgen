@@ -10,7 +10,7 @@ jobs:
     working_directory: /go/src/github.com/lologarithm/netgen
     steps:
       - checkout
-      - run: go install ./cmd/netgen/
+      - run: GO111MODULE=on go install ./cmd/netgen/
       - run: netgen --dir=./benchmark
       - run: netgen --dir=./example/newmodels
       - run: netgen --dir=./example/models
