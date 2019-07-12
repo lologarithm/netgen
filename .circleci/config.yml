@@ -11,7 +11,7 @@ jobs:
     steps:
       - checkout
       - run: GO111MODULE=on go install ./cmd/netgen/
-      - run: netgen --dir=./benchmark
+      - run: netgen --dir=./benchmark/models
       - run: netgen --dir=./example/newmodels
       - run: netgen --dir=./example/models
       - run: GO111MODULE=on go test -v ./...
