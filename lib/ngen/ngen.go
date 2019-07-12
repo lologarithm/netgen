@@ -57,7 +57,7 @@ func (v Context) Length(_ *Context) int {
 
 func (c *Context) Deserialize(ctx *Context, buf *Buffer) error {
 	*c = *DeserializeContext(ctx, buf)
-	return nil
+	return buf.Err
 }
 
 // DeserializeContext constructs a new Context from the binary data.

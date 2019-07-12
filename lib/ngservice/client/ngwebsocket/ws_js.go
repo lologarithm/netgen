@@ -4,11 +4,12 @@ package ngwebsocket
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	"github.com/gopherjs/gopherjs/js"
 	"github.com/lologarithm/netgen/lib/ngen"
-	"github.com/lologarithm/netgen/lib/ngen/client"
+	"github.com/lologarithm/netgen/lib/ngservice/client"
 )
 
 // New has _ to follow the pattern from the Go client.
@@ -52,6 +53,7 @@ func (ws *wsjs) Read(p []byte) (int, error) {
 	if ws.idx == 0 {
 		select {
 		case slice := <-ws.framebuf:
+			log.Printf("Got message from network: %v", slice)
 			copy(ws.buffer[ws.idx:], slice)
 			ws.idx += len(slice)
 		case <-time.NewTimer(time.Second * 60).C:
@@ -88,6 +90,7 @@ func (ws *wsjs) Write(p []byte) (int, error) {
 			panic(e)
 		}
 	}()
+	print("Writing bytes: ", p)
 	ws.conn.Call("send", p)
 	return len(p), err
 }

@@ -222,6 +222,7 @@ func main() {
 		pkgs[pkg.Name] = &generate.ParsedPkg{
 			Name:       pkg.Name,
 			Pkg:        pkg,
+			Imports:    map[string]struct{}{},
 			Messages:   []generate.Message{},
 			Enums:      []generate.Enum{},
 			MessageMap: map[string]generate.Message{},
@@ -296,6 +297,10 @@ func main() {
 					fieldPkg = msg.Package
 				}
 				opkg := pkgs[fieldPkg]
+				if mf.RemotePackage != "" {
+					// Only include remote packages.
+					pkg.Imports[opkg.Pkg.ImportPath] = struct{}{}
+				}
 				if opkg != nil {
 					omsg, hasMessage := opkg.MessageMap[mf.Type]
 					if hasMessage {
@@ -346,8 +351,9 @@ func main() {
 				ioutil.WriteFile(filepath.Join(pkgdir, "ngenSerial.go"), buf.Bytes(), 0644)
 			case "js":
 				jsfile := generate.WriteJSConverter(pkg)
-				rootpkg := filepath.Join(wd, *outdir)
-				ioutil.WriteFile(path.Join(rootpkg, "ngenjs.go"), jsfile, 0666)
+				log.Printf("Now writing %s", path.Join(pkgdir, "ngen_js.go"))
+				fmt.Printf("JSFile:\n%s\n", jsfile)
+				ioutil.WriteFile(path.Join(pkgdir, "ngen_js.go"), jsfile, 0666)
 			case "cs":
 				// generate.WriteCS(messages, messageMap)
 			}

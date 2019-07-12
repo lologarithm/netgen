@@ -6,15 +6,13 @@ import (
 	"strings"
 )
 
-// TODO: fix this to generate in the correct location!
-// Also generate the new lib!
 func WriteJSConverter(pkg *ParsedPkg) []byte {
 	buf := &bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("%spackage %s\n\nimport (\n\t\"github.com/gopherjs/gopherjs/js\"\n\t\"github.com/lologarithm/netgen/lib/ngen\"\n)\n\n", HeaderComment(), pkg.Name))
+	buf.WriteString(fmt.Sprintf("%s\npackage %s\n\nimport (\n\t\"github.com/gopherjs/gopherjs/js\"\n\t\"github.com/lologarithm/netgen/lib/ngen\"\n)\n\n", HeaderComment(), pkg.Name))
 
 	// 1.a. Parent parser function
 	buf.WriteString("// ParseNetMessageJS accepts input of js.Object, parses it and returns a Net message.\n")
-	buf.WriteString("func ParseNetMessageJS(jso *js.Object, t ngen.MessageType) ngen.Net {\n")
+	buf.WriteString("func ParseNetMessageJS(jso *js.Object, t ngen.MessageType) ngen.Message {\n")
 	buf.WriteString("\tswitch t {\n")
 	for _, t := range pkg.Messages {
 		buf.WriteString(fmt.Sprintf("\tcase %sMsgType:\n", t.Name))

@@ -46,10 +46,10 @@ func ReadPacket(ctx *ngen.Context, rawBytes []byte) (packet Packet, ok bool) {
 
 // WriteMessage turns a message into byte slice for writing to network
 func WriteMessage(ctx *ngen.Context, msg ngen.Message) []byte {
-	length := msg.Length(ctx) + headerLen
-	buf := ngen.NewBuffer(make([]byte, length))
+	length := msg.Length(ctx)
+	buf := ngen.NewBuffer(make([]byte, length+headerLen))
 	buf.WriteUint32(uint32(msg.MsgType()))
 	buf.WriteUint16(uint16(length))
 	msg.Serialize(ctx, buf)
-	return buf.Buf
+	return buf.Bytes()
 }

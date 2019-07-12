@@ -35,6 +35,9 @@ func goFieldName(m MessageField) string {
 func GoLibHeader(pkg *ParsedPkg) string {
 	gobuf := &bytes.Buffer{}
 	gobuf.WriteString(fmt.Sprintf("%s\npackage %s\n\nimport (\n\t\"github.com/lologarithm/netgen/lib/ngen\"", HeaderComment(), pkg.Name))
+	for imp := range pkg.Imports {
+		gobuf.WriteString(fmt.Sprintf("\n\t\"%s\"", imp))
+	}
 	gobuf.WriteString("\n)\n\n\n")
 
 	fldbuf := &bytes.Buffer{}
@@ -54,6 +57,7 @@ func GoLibHeader(pkg *ParsedPkg) string {
 		FieldVersions: map[ngen.MessageType][]byte{
 			%s
 		},
+		Read: Read,
 	}
 `, fldbuf.String()))
 
@@ -72,7 +76,7 @@ func GoLibHeader(pkg *ParsedPkg) string {
 func Read(ctx *ngen.Context, msgType ngen.MessageType, content *ngen.Buffer) ngen.Message {
 	switch msgType {
 		case ngen.MessageTypeContext:
-			return ngen.DeserializeContext(Context, content)
+			return ngen.DeserializeContext(&ngen.Context{Read: Read}, content)
 %s
 		default:
 			return nil

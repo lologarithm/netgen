@@ -29,6 +29,8 @@ func runClient(c *client.Client, ss *server) {
 		case *models.VersionedMessage:
 			fmt.Printf(" Got versioned message: %#v", tmsg)
 			c.Outgoing <- msg
+		default:
+			fmt.Printf("Got a message from the client: %#v\n", msg)
 		}
 	}
 

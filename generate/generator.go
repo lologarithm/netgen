@@ -10,6 +10,7 @@ type ParsedPkg struct {
 	Name       string
 	Pkg        *build.Package
 	Files      []*ast.File
+	Imports    map[string]struct{} // Set of imports in parsed messages
 	Messages   []Message
 	Enums      []Enum
 	MessageMap map[string]Message

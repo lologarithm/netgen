@@ -27,6 +27,12 @@ func NewBuffer(b []byte) *Buffer {
 	return &Buffer{buf: b, ab: ib, view: dv}
 }
 
+// Bytes returns buffer up to the current write location.
+// This is not useful for reading buffers.
+func (b *Buffer) Bytes() []byte {
+	return b.buf[:b.loc]
+}
+
 func (b *Buffer) Reset() {
 	b.loc = 0
 }
