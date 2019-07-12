@@ -14,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -261,36 +262,25 @@ func main() {
 			r.Close()
 			parseFile(file, pkgs[pkg.Name])
 		}
-
-		// TODO: walk through local types and assign the messagefield pointers.
 	}
 
 	parsePkg(pkg)
 
-	// TODO: Validate that we are correctly using versioning
-	// for _, msg := range messages {
-	// 	if !msg.Versioned {
-	// 		continue
-	// 	}
-	// 	sort.Slice(msg.Fields, func(i int, j int) bool {
-	// 		return msg.Fields[i].Order < msg.Fields[j].Order
-	// 	})
-	// 	seen := map[int]bool{}
-	// 	for _, f := range msg.Fields {
-	// 		if ok := seen[f.Order]; ok {
-	// 			log.Fatalf("Duplicate Field IDs on versioned struct: %s", msg.Name)
-	// 		}
-	// 		seen[f.Order] = true
-	// 	}
-	// }
-
-	// msgs := map[string][]generate.Message{}
-
-	// msgqueue := make([]generate.Message, len(pkgs[pkg.Name].Messages))
-	// copy(msgqueue, pkgs[pkg.Name].Messages)
-
+	// Validates strut field versions and connects message type pointers.
 	for _, pkg := range pkgs {
 		for _, msg := range pkg.Messages {
+			if msg.Versioned {
+				sort.Slice(msg.Fields, func(i int, j int) bool {
+					return msg.Fields[i].Order < msg.Fields[j].Order
+				})
+				seen := map[int]bool{}
+				for _, f := range msg.Fields {
+					if ok := seen[f.Order]; ok {
+						log.Fatalf("Duplicate Field IDs on versioned struct: %s", msg.Name)
+					}
+					seen[f.Order] = true
+				}
+			}
 			for i, mf := range msg.Fields {
 				fieldPkg := mf.RemotePackage
 				if fieldPkg == "" {
