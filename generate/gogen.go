@@ -173,7 +173,10 @@ func WriteGoLen(f MessageField, scopeDepth int, buf *bytes.Buffer) {
 		buf.WriteString("mylen += 4\n\t")
 		fn := "v" + strconv.Itoa(scopeDepth+1)
 		buf.WriteString(fmt.Sprintf("for _, %s := range %s {\n", fn, n))
-		WriteGoLen(MessageField{Name: fn, Type: f.Type, Order: f.Order, Pointer: f.Pointer}, scopeDepth+1, buf)
+		mf := f
+		mf.Array = false
+		mf.Name = fn
+		WriteGoLen(mf, scopeDepth+1, buf)
 		writeTabScope(buf, scopeDepth)
 		buf.WriteString("}\n")
 		return
@@ -247,7 +250,10 @@ func WriteGoSerializeField(f MessageField, scopeDepth int, buf *bytes.Buffer) {
 		writeArrayLen(f, scopeDepth, buf)
 		fn := "v" + strconv.Itoa(scopeDepth+1)
 		buf.WriteString(fmt.Sprintf("for _, %s := range %s {\n", fn, n))
-		WriteGoSerializeField(MessageField{Name: fn, Type: f.Type, Order: f.Order, Pointer: f.Pointer}, scopeDepth+1, buf)
+		mf := f
+		mf.Array = false
+		mf.Name = fn
+		WriteGoSerializeField(mf, scopeDepth+1, buf)
 		writeTabScope(buf, scopeDepth)
 		buf.WriteString("}\n")
 		return
@@ -350,7 +356,10 @@ func WriteGoDeserialField(f MessageField, includeM bool, scopeDepth int, buf *by
 			fn += "m."
 		}
 		fn += f.Name + "[i]"
-		WriteGoDeserialField(MessageField{Name: fn, Type: f.Type, Pointer: f.Pointer}, false, scopeDepth+1, buf)
+		mf := f
+		mf.Array = false
+		mf.Name = fn
+		WriteGoDeserialField(mf, false, scopeDepth+1, buf)
 		writeTabScope(buf, scopeDepth)
 		buf.WriteString("}\n")
 		return
