@@ -8,7 +8,7 @@ import (
 
 	"github.com/gopherjs/gopherjs/js"
 	"github.com/lologarithm/netgen/lib/ngen"
-	"github.com/lologarithm/netgen/lib/ngen/client"
+	"github.com/lologarithm/netgen/lib/ngservice/client"
 )
 
 // New has _ to follow the pattern from the Go client.
@@ -36,8 +36,8 @@ func New(url, _ string, onConnect func()) (*client.Client, error) {
 
 	return &client.Client{
 		Conn:     ws,
-		Outgoing: make(chan *ngen.Packet, 10),
-		Incoming: make(chan *ngen.Packet, 10),
+		Outgoing: make(chan ngen.Message, 10),
+		Incoming: make(chan ngen.Message, 10),
 	}, nil
 }
 

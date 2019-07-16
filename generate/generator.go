@@ -1,10 +1,26 @@
 package generate
 
-import "hash/crc32"
+import (
+	"go/ast"
+	"go/build"
+	"hash/crc32"
+)
+
+type ParsedPkg struct {
+	Name       string
+	Pkg        *build.Package
+	Files      []*ast.File
+	Imports    map[string]struct{} // Set of imports in parsed messages
+	Messages   []Message
+	Enums      []Enum
+	MessageMap map[string]Message
+	EnumMap    map[string]Enum
+}
 
 // Message is a message that can be serialized across network.
 type Message struct {
 	Name      string         // name of message
+	Package   string         // Source package
 	Fields    []MessageField // list of fields on the message
 	Versioned bool           // If this message contains versioning tags
 	SelfSize  int            // size of message not counting sub objects
@@ -30,14 +46,17 @@ type EnumValue struct {
 
 // MessageField is a single field of a message.
 type MessageField struct {
-	Name      string
-	Type      string
-	Array     bool
-	Pointer   bool
-	Order     int
-	Size      int
-	Embedded  bool
-	Interface bool // used only for generating from existing interfaces
+	Name          string
+	Type          string
+	MsgType       *Message
+	EnumType      *Enum
+	RemotePackage string
+	Array         bool
+	Pointer       bool
+	Order         int
+	Size          int
+	Embedded      bool
+	Interface     bool // used only for generating from existing interfaces
 }
 
 // Allowed types to generate from
@@ -53,5 +72,6 @@ const (
 	Uint32Type  string = "uint32"
 	Int64Type   string = "int64"
 	Uint64Type  string = "uint64"
+	Float32Type string = "float32"
 	Float64Type string = "float64"
 )

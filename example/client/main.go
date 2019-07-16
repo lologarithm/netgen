@@ -7,16 +7,24 @@ import (
 
 	"github.com/gopherjs/gopherjs/js"
 	"github.com/lologarithm/netgen/example/newmodels"
-	"github.com/lologarithm/netgen/lib/ngen"
-	"github.com/lologarithm/netgen/lib/ngen/client"
-	"github.com/lologarithm/netgen/lib/ngen/client/ngwebsocket"
+	"github.com/lologarithm/netgen/lib/ngservice/client"
+	"github.com/lologarithm/netgen/lib/ngservice/client/ngwebsocket"
 )
 
 func main() {
-	print("loaded")
+	print("Starting!")
 	js.Global.Set("ngex", map[string]interface{}{
 		"newClient": newClient,
 	})
+
+	c := &Client{
+		CEvents: &Events{},
+	} // ngex.newClient()
+	c.CEvents.OnConnected(func(arg1 bool) {
+		c.Outgoing <- newmodels.Message{Message: "Hello World."} // c.SendMessage({Message:"Hello World"})
+		c.Outgoing <- newmodels.VersionedMessage{Message: "Version Hello World!", From: "The Client", NewHotness: 42.0}
+	})
+	c.Dial("")
 }
 
 func newClient() *js.Object {
@@ -27,13 +35,15 @@ func newClient() *js.Object {
 }
 
 func runClient(c *Client) {
-	for packet := range c.Incoming {
-		if packet == nil {
+	for msg := range c.Incoming {
+		if msg == nil {
 			break
 		}
-		switch packet.Header.MsgType {
+		switch msg.MsgType() {
 		case newmodels.MessageMsgType:
-			print("Got message: ", packet.NetMsg.(*newmodels.Message).Message, "\n")
+			print("Got message: ", msg.(*newmodels.Message).Message, "\n")
+		case newmodels.VersionedMessageMsgType:
+			print("Got message: ", msg)
 		}
 	}
 	print("Got nil packet, shutting down client reader.\n")
@@ -59,11 +69,11 @@ func (c *Client) Events() *js.Object {
 }
 
 func (c *Client) SendMessage(jso *js.Object) {
-	c.Outgoing <- ngen.NewPacket(newmodels.MessageFromJS(jso))
+	c.Outgoing <- newmodels.MessageFromJS(jso)
 }
 
 func (c *Client) SendVerMessage(jso *js.Object) {
-	c.Outgoing <- ngen.NewPacket(newmodels.VersionedMessageFromJS(jso))
+	c.Outgoing <- newmodels.VersionedMessageFromJS(jso)
 }
 
 func (c *Client) Dial(url string) {
@@ -79,7 +89,7 @@ func (c *Client) Dial(url string) {
 			if c.CEvents != nil && c.CEvents.connected != nil {
 				c.CEvents.connected(true)
 			}
-			newmodels.ManageClient(c.Client)
+			client.ManageClient(newmodels.Context, c.Client)
 			go runClient(c)
 		})
 		if err != nil {

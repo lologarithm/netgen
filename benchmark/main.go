@@ -1,9 +1,9 @@
 package main
 
-import "github.com/lologarithm/netgen/lib/ngen"
+import "github.com/lologarithm/netgen/benchmark/models"
 
 func main() {
-	m := &Benchy{
+	m := &models.Benchy{
 		Name:     "asdfasdfasdfasdf",
 		BirthDay: 1234567801,
 		Phone:    "123-456-7890",
@@ -13,43 +13,4 @@ func main() {
 	}
 	print(m)
 	// stub so gopherjs stops whining
-}
-
-type Benchy struct {
-	Name     string
-	BirthDay int64
-	Phone    string
-	Siblings int32
-	Spouse   byte
-	Money    float64
-}
-
-type FeaturesOne struct {
-	Dynd *FeaturesOne
-	V    int
-}
-
-type Features struct {
-	Dynd          MyInterface
-	Bin           []byte
-	OtherFeatures []*Features
-	DatBenchy     Benchy
-	EnumyV        Enumy
-}
-
-type Enumy int32
-
-const (
-	A Enumy = iota
-	B
-	C
-)
-
-func (f *Features) Stuff() {
-	// and things
-}
-
-type MyInterface interface {
-	ngen.Net
-	Stuff()
 }

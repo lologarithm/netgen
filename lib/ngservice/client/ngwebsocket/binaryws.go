@@ -4,7 +4,7 @@ package ngwebsocket
 
 import (
 	"github.com/lologarithm/netgen/lib/ngen"
-	"github.com/lologarithm/netgen/lib/ngen/client"
+	"github.com/lologarithm/netgen/lib/ngservice/client"
 	"golang.org/x/net/websocket"
 )
 
@@ -15,8 +15,8 @@ func AcceptConn(conn *websocket.Conn) *client.Client {
 	return &client.Client{
 		Name:     conn.RemoteAddr().String(),
 		Conn:     &BinaryWebsocket{socket: conn},
-		Outgoing: make(chan *ngen.Packet, 10),
-		Incoming: make(chan *ngen.Packet, 10),
+		Outgoing: make(chan ngen.Message, 10),
+		Incoming: make(chan ngen.Message, 10),
 	}
 }
 
@@ -37,8 +37,8 @@ func New(url, origin string, onOpen func()) (*client.Client, error) {
 
 	return &client.Client{
 		Conn:     ws,
-		Outgoing: make(chan *ngen.Packet, 10),
-		Incoming: make(chan *ngen.Packet, 10),
+		Outgoing: make(chan ngen.Message, 10),
+		Incoming: make(chan ngen.Message, 10),
 	}, nil
 }
 

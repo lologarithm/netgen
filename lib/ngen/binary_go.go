@@ -49,6 +49,14 @@ func PutUint64(b []byte, v uint64) {
 	b[7] = byte(v >> 56)
 }
 
+func Float32(b []byte) float32 {
+	return math.Float32frombits(Uint32(b))
+}
+
+func PutFloat32(b []byte, v float32) {
+	PutUint32(b, math.Float32bits(v))
+}
+
 func Float64(b []byte) float64 {
 	return math.Float64frombits(Uint64(b))
 }

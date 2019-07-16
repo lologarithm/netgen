@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"sync"
 
-	"github.com/lologarithm/netgen/lib/ngen/client"
-	"github.com/lologarithm/netgen/lib/ngen/client/ngwebsocket"
+	"github.com/lologarithm/netgen/lib/ngservice/client"
+	"github.com/lologarithm/netgen/lib/ngservice/client/ngwebsocket"
 	"golang.org/x/net/websocket"
 )
 

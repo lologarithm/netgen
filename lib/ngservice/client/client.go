@@ -5,25 +5,33 @@ import (
 	"io"
 
 	"github.com/lologarithm/netgen/lib/ngen"
+	"github.com/lologarithm/netgen/lib/ngservice"
 )
 
 type Client struct {
 	ID       int32
 	Name     string
 	Conn     io.ReadWriteCloser
-	Outgoing chan *ngen.Packet
-	Incoming chan *ngen.Packet
+	Outgoing chan ngen.Message
+	Incoming chan ngen.Message
+}
+
+func ManageClient(ctx *ngen.Context, c *Client) {
+	settingsSync := make(chan *ngen.Context)
+	go Sender(c, ctx, settingsSync)
+	go Reader(c, ctx, settingsSync)
 }
 
 // Reader spawns a block for loop reading off the conn on Client
 // it will put all read packets onto the incoming channel.
 // This code requires the conn to not shard packets.
-func Reader(c *Client, parser ngen.NetParser, remote chan *ngen.Settings) {
+func Reader(c *Client, local *ngen.Context, remote chan *ngen.Context) {
 	idx := 0
 	buffer := make([]byte, 4096)
 	// Cached versioning info.
 	// This means we don't have to send it on every request, only on each connection.
-	var remoteSettings *ngen.Settings
+
+	remoteSettings := local // Use local settings until we have a remote.
 
 	for {
 		n, err := c.Conn.Read(buffer[idx:])
@@ -41,7 +49,7 @@ func Reader(c *Client, parser ngen.NetParser, remote chan *ngen.Settings) {
 			continue
 		}
 
-		p, ok := ngen.NextPacket(buffer[:idx+n], parser, remoteSettings)
+		p, ok := ngservice.ReadPacket(remoteSettings, buffer[:idx+n])
 		if !ok {
 			// increment idx by how much we wrote.
 			idx += n
@@ -49,13 +57,13 @@ func Reader(c *Client, parser ngen.NetParser, remote chan *ngen.Settings) {
 			continue
 		}
 
-		if p.Header.MsgType == 0 {
+		if p.Header.MsgType == ngen.MessageTypeContext {
 			fmt.Printf("Got remote settings: %#v\n", p.NetMsg)
-			remoteSettings = p.NetMsg.(*ngen.Settings)
+			remoteSettings = p.NetMsg.(*ngen.Context)
 			remote <- remoteSettings // send to 'sender' channel now
 		} else {
 			// Successful packet read
-			c.Incoming <- &p
+			c.Incoming <- p.NetMsg
 		}
 
 		// copy back in case we have multiple packets in the buffer
@@ -68,14 +76,14 @@ func Reader(c *Client, parser ngen.NetParser, remote chan *ngen.Settings) {
 	close(c.Incoming)
 }
 
-func Sender(c *Client, myVer *ngen.Settings, remote chan *ngen.Settings) {
-	var remoteSettings *ngen.Settings
+func Sender(c *Client, local *ngen.Context, remote chan *ngen.Context) {
+	remoteSettings := local // start with local settings by default
 
 	// Only send and wait for versioning message if we have versioned messages
-	if len(myVer.FieldVersions) > 0 {
+	if len(local.FieldVersions) > 0 {
 		// First message out is the settings (versioning info) for this instance.
 		// This will allow the other side to read our versioned structs.
-		n, err := c.Conn.Write(ngen.NewPacket(myVer).Pack(nil))
+		n, err := c.Conn.Write(ngservice.WriteMessage(nil, local))
 		if err != nil || n == 0 {
 			fmt.Printf("Failed to write handshake settings with remote: %s", err.Error())
 			return
@@ -88,7 +96,7 @@ func Sender(c *Client, myVer *ngen.Settings, remote chan *ngen.Settings) {
 		if m == nil {
 			return // Empty message means die
 		}
-		n, err := c.Conn.Write(m.Pack(remoteSettings))
+		n, err := c.Conn.Write(ngservice.WriteMessage(remoteSettings, m))
 		if err != nil {
 			fmt.Printf("Writing failed: %s\n", err.Error())
 			break

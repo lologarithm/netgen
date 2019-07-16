@@ -6,17 +6,15 @@ import (
 	"strings"
 )
 
-// TODO: fix this to generate in the correct location!
-// Also generate the new lib!
-func WriteJSConverter(pkgname string, messages []Message, messageMap map[string]Message, enums []Enum, enumMap map[string]Enum) []byte {
+func WriteJSConverter(pkg *ParsedPkg) []byte {
 	buf := &bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("%spackage %s\n\nimport (\n\t\"github.com/gopherjs/gopherjs/js\"\n\t\"github.com/lologarithm/netgen/lib/ngen\"\n)\n\n", HeaderComment(), pkgname))
+	buf.WriteString(fmt.Sprintf("%s\npackage %s\n\nimport (\n\t\"github.com/gopherjs/gopherjs/js\"\n\t\"github.com/lologarithm/netgen/lib/ngen\"\n)\n\n", HeaderComment(), pkg.Name))
 
 	// 1.a. Parent parser function
 	buf.WriteString("// ParseNetMessageJS accepts input of js.Object, parses it and returns a Net message.\n")
-	buf.WriteString("func ParseNetMessageJS(jso *js.Object, t ngen.MessageType) ngen.Net {\n")
+	buf.WriteString("func ParseNetMessageJS(jso *js.Object, t ngen.MessageType) ngen.Message {\n")
 	buf.WriteString("\tswitch t {\n")
-	for _, t := range messages {
+	for _, t := range pkg.Messages {
 		buf.WriteString(fmt.Sprintf("\tcase %sMsgType:\n", t.Name))
 		buf.WriteString("\t\tmsg := ")
 		buf.WriteString(t.Name)
@@ -24,21 +22,21 @@ func WriteJSConverter(pkgname string, messages []Message, messageMap map[string]
 	}
 	buf.WriteString("\tdefault:\n\t\treturn nil\n\t}\n}\n\n")
 
-	for _, msg := range messages {
-		WriteJSConvertFunc(buf, msg, messageMap, enumMap)
+	for _, msg := range pkg.Messages {
+		WriteJSConvertFunc(buf, msg, pkg)
 	}
 	return buf.Bytes()
 }
 
-func WriteJSConvertFunc(buf *bytes.Buffer, msg Message, msgMap map[string]Message, enumMap map[string]Enum) {
+func WriteJSConvertFunc(buf *bytes.Buffer, msg Message, pkg *ParsedPkg) {
 	buf.WriteString(fmt.Sprintf("func %sFromJS(jso *js.Object) (m %s) {", msg.Name, msg.Name))
 	for _, f := range msg.Fields {
-		WriteJSConvertField(buf, f, "", msgMap, enumMap, 1)
+		WriteJSConvertField(buf, f, "", pkg, 1)
 	}
 	buf.WriteString("\n\treturn m\n}\n")
 }
 
-func WriteJSConvertField(buf *bytes.Buffer, f MessageField, subindex string, msgMap map[string]Message, enumMap map[string]Enum, scopeDepth int) {
+func WriteJSConvertField(buf *bytes.Buffer, f MessageField, subindex string, pkg *ParsedPkg, scopeDepth int) {
 	buf.WriteString("\n")
 	buf.WriteString(strings.Repeat("\t", scopeDepth))
 
@@ -69,9 +67,9 @@ func WriteJSConvertField(buf *bytes.Buffer, f MessageField, subindex string, msg
 		buf.WriteString(")\n")
 		buf.WriteString(strings.Repeat("\t", scopeDepth))
 		buf.WriteString(fmt.Sprintf("for i := 0; i < %s; i++ {", sublen))
-		WriteJSConvertField(buf, MessageField{Name: f.Name, Type: f.Type, Pointer: f.Pointer}, "i", msgMap, enumMap, scopeDepth+1)
+		WriteJSConvertField(buf, MessageField{Name: f.Name, Type: f.Type, Pointer: f.Pointer}, "i", pkg, scopeDepth+1)
 		buf.WriteString("\n\t}")
-	} else if _, ok := msgMap[f.Type]; ok {
+	} else if _, ok := pkg.MessageMap[f.Type]; ok {
 		// We have another message type
 		if f.Pointer {
 			subName := "sub" + f.Name
@@ -84,7 +82,7 @@ func WriteJSConvertField(buf *bytes.Buffer, f MessageField, subindex string, msg
 		} else {
 			buf.WriteString(fmt.Sprintf("%s = %sFromJS(jso.%s)", setname, f.Type, getname))
 		}
-	} else if _, ok := enumMap[f.Type]; ok {
+	} else if _, ok := pkg.EnumMap[f.Type]; ok {
 		buf.WriteString(fmt.Sprintf("%s = %s(jso.%s.Int64())", setname, f.Type, getname))
 	} else {
 		buf.WriteString(fmt.Sprintf("%s = ", setname))

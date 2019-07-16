@@ -5,38 +5,39 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lologarithm/netgen/benchmark/models"
 	"github.com/lologarithm/netgen/lib/ngen"
 )
 
 func TestFeaturesOne(t *testing.T) {
-	ft := FeaturesOne{
-		Dynd: &FeaturesOne{V: 1},
+	val := 1
+	ft := models.FeaturesOne{
+		Dynd: &models.FeaturesOne{V: val},
 		V:    2,
 		// Bin:           []byte{1, 2, 3},
 		// OtherFeatures: []*Features{{EnumyV: 11}},
 		// EnumyV:        Enumy(10),
 	}
 
-	buff := make([]byte, ft.Len())
-	ft.Serialize(buff, nil)
-	newft := FeaturesOneDeserialize(ngen.NewBuffer(buff), nil)
-	if newft.Dynd.V != 1 {
+	buf := ngen.NewBuffer(make([]byte, ft.Length(nil)))
+	ft.Serialize(models.Context, buf)
+	newft := models.DeserializeFeaturesOne(models.Context, ngen.NewBuffer(buf.Bytes()))
+	if newft.Dynd.V != val {
 		t.FailNow()
 	}
 }
 
 func TestFeatures(t *testing.T) {
-	ft := Features{
-		Dynd:          &Features{},
+	ft := models.Features{
+		Dynd:          &models.Features{},
 		Bin:           []byte{1, 2, 3},
-		OtherFeatures: []*Features{{EnumyV: 11}},
-		EnumyV:        Enumy(10),
+		OtherFeatures: []*models.Features{{EnumyV: 11}},
+		EnumyV:        models.Enumy(10),
 	}
 
-	buff := make([]byte, ft.Len())
-	ft.Serialize(buff, nil)
-
-	newft := FeaturesDeserialize(ngen.NewBuffer(buff), nil)
+	buf := ngen.NewBuffer(make([]byte, ft.Length(nil)))
+	ft.Serialize(nil, buf)
+	newft := models.DeserializeFeatures(nil, ngen.NewBuffer(buf.Bytes()))
 
 	if len(ft.Bin) != len(newft.Bin) {
 		t.Fatalf("Binary blob len doesn't match: %v vs %v", ft.Bin, newft.Bin)
@@ -54,10 +55,10 @@ func TestFeatures(t *testing.T) {
 		t.FailNow()
 	}
 }
-func generateNetGen() []*Benchy {
-	a := make([]*Benchy, 0, 1000)
+func generateNetGen() []*models.Benchy {
+	a := make([]*models.Benchy, 0, 1000)
 	for i := 0; i < 1000; i++ {
-		a = append(a, &Benchy{
+		a = append(a, &models.Benchy{
 			Name:     "asdfasdfasdfasdf",
 			BirthDay: time.Now().UnixNano(),
 			Phone:    "123-456-7890",
@@ -76,7 +77,8 @@ func BenchmarkNetGenMarshal(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		obj := data[rand.Intn(len(data))]
-		obj.Serialize(make([]byte, obj.Len()), nil)
+		buf := ngen.NewBuffer(make([]byte, obj.Length(nil)))
+		obj.Serialize(nil, buf)
 	}
 }
 
@@ -86,15 +88,15 @@ func BenchmarkNetGenUnmarshal(b *testing.B) {
 	data := generateNetGen()
 	ser := make([]*ngen.Buffer, len(data))
 	for i, d := range data {
-		buf := make([]byte, d.Len())
-		d.Serialize(buf, nil)
-		ser[i] = ngen.NewBuffer(buf)
+		buf := ngen.NewBuffer(make([]byte, d.Length(nil)))
+		d.Serialize(nil, buf)
+		ser[i] = ngen.NewBuffer(buf.Bytes())
 	}
 	b.ReportAllocs()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		n := i % len(ser)
-		o := BenchyDeserialize(ser[n], nil)
+		o := models.DeserializeBenchy(nil, ser[n])
 		ser[n].Reset()
 		// Validate unmarshalled data.
 		if validate != "" {

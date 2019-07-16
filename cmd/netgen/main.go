@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"io/ioutil"
@@ -18,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/lologarithm/netgen/generate"
+	"golang.org/x/tools/go/buildutil"
 )
 
 var genlist = flag.String("gen", "go", "list of languages to generate bindings for, separated by commas")
@@ -25,7 +27,7 @@ var dir = flag.String("dir", "", "Input directory to transpile")
 var outdir = flag.String("out", "", "Output directory for deserializer package")
 var version = flag.Bool("version", false, "Prints the version")
 
-var verNum = "0.0.1"
+var verNum = "1.0.0"
 
 func main() {
 	flag.Parse()
@@ -35,42 +37,30 @@ func main() {
 		os.Exit(0)
 	}
 
-	messages := []generate.Message{}
-	enums := []generate.Enum{}
-	messageMap := map[string]generate.Message{}
-	enumMap := map[string]generate.Enum{}
-
 	// 1. search given package for all public types
-	count := 0
 	fset := token.NewFileSet()
 	wd, _ := os.Getwd()
 	pkgpath := filepath.Join(wd, *dir)
-	files, err := ioutil.ReadDir(pkgpath)
+
+	bc := &build.Context{
+		GOROOT:      build.Default.GOROOT,
+		GOPATH:      build.Default.GOPATH,
+		GOOS:        build.Default.GOOS,
+		GOARCH:      build.Default.GOARCH,
+		Compiler:    "gc",
+		BuildTags:   []string{"purego"},
+		ReleaseTags: build.Default.ReleaseTags,
+		CgoEnabled:  true, // detect `import "C"` to throw proper error
+	}
+	pkg, err := bc.ImportDir(pkgpath, 0)
 	if err != nil {
 		panic(err)
 	}
-	parsed := make([]*ast.File, len(files))
-	for _, fi := range files {
-		fn := fi.Name()
-		if strings.HasSuffix(fn, ".go") && !strings.HasSuffix(fn, "_test.go") {
-			f, err := parser.ParseFile(fset, filepath.Join(pkgpath, fn), nil, 0)
-			if err == nil {
-				parsed[count] = f
-				count++
-			} else {
-				fmt.Fprintf(os.Stderr, "Exception: %v\n", err)
-				os.Exit(1)
-			}
-		}
-	}
-	parsed = parsed[:count]
-	if count == 0 {
-		fmt.Printf("No go files found to parse.\n")
-		os.Exit(1)
-	}
-	pkgname := parsed[0].Name.Name
 
-	for _, f := range parsed {
+	pkgs := map[string]*generate.ParsedPkg{"github.com/lologarithm/netgen/lib/ngen": &generate.ParsedPkg{}}
+
+	var parseFile func(f *ast.File, pkg *generate.ParsedPkg)
+	parseFile = func(f *ast.File, pkg *generate.ParsedPkg) {
 		for _, decl := range f.Decls {
 			switch d := decl.(type) {
 			case *ast.GenDecl:
@@ -83,8 +73,10 @@ func main() {
 						}
 						switch tsType := ts.Type.(type) {
 						case *ast.StructType:
-							msg := generate.Message{}
-							msg.Name = ts.Name.Name
+							msg := generate.Message{
+								Name:    ts.Name.Name,
+								Package: pkg.Name,
+							}
 							var fields []generate.MessageField
 							for _, tfi := range tsType.Fields.List {
 								emb := false
@@ -123,12 +115,18 @@ func main() {
 									}
 								}
 								size := 0
-								identType, isArray, isPointer := getidenttype(tfi.Type, false, false)
+								pkgSel, identType, isArray, isPointer := getidenttype(tfi.Type, false, false)
+								// log.Printf("Looking at field: %s, %s", pkgSel, identType)
 								if identType == nil {
 									// this means we don't handle this field type
 									continue
 								}
 								typeval := identType.Name
+								rp := "" // remote package name
+								if pkgSel != nil {
+									// typeval = pkgSel.Name + "." + typeval
+									rp = pkgSel.Name
+								}
 								if emb {
 									name = typeval
 								}
@@ -146,32 +144,32 @@ func main() {
 									msg.Versioned = true
 								}
 								fields = append(fields, generate.MessageField{
-									Name:      name,
-									Type:      typeval,
-									Array:     isArray,
-									Pointer:   isPointer,
-									Order:     customOrder,
-									Size:      size,
-									Embedded:  emb,
-									Interface: isInterface,
+									Name:          name,
+									RemotePackage: rp,
+									Type:          typeval,
+									Array:         isArray,
+									Pointer:       isPointer,
+									Order:         customOrder,
+									Size:          size,
+									Embedded:      emb,
+									Interface:     isInterface,
 								})
 							}
 							msg.Fields = fields
-							messages = append(messages, msg)
-							messageMap[msg.Name] = msg
-							fmt.Printf("Added message type %s\n", msg.Name)
+							pkg.Messages = append(pkg.Messages, msg)
+							pkg.MessageMap[msg.Name] = msg
+							// fmt.Printf("Added message type %s\n", msg.Name)
 						case *ast.InterfaceType:
 							// skip - no need to handle this i think
 						case *ast.Ident:
 							// this is a const type
 							if tsType.Name == "string" {
-								fmt.Printf("can't use const of type %s\n", tsType.Name)
 								break
 							}
 							enum := generate.Enum{Name: ts.Name.Name}
-							enums = append(enums, enum)
+							pkg.Enums = append(pkg.Enums, enum)
 							fmt.Printf("Added enum type %s\n", ts.Name.Name)
-							enumMap[ts.Name.Name] = enum
+							pkg.EnumMap[ts.Name.Name] = enum
 						default:
 							fmt.Printf("Unknown type lib declaration: %s, %v\n", reflect.TypeOf(ts.Type), ts.Type)
 						}
@@ -212,59 +210,142 @@ func main() {
 				fmt.Printf("Other declaration in file? %T, %#v\n", d, d)
 			}
 		}
-		// for _, imp := range f.Imports {
-		// 	fmt.Printf("import %#v\n", imp.Path.Value)
-		// 	// TODO: also create the imports serializers?
-		// }
 	}
 
-	// Validate that we are correctly using versioning or not.
-	for _, msg := range messages {
-		if !msg.Versioned {
-			continue
+	var parsePkg func(pkg *build.Package)
+	parsePkg = func(pkg *build.Package) {
+		if _, ok := pkgs[pkg.Name]; ok {
+			return
 		}
-		sort.Slice(msg.Fields, func(i int, j int) bool {
-			return msg.Fields[i].Order < msg.Fields[j].Order
-		})
-		seen := map[int]bool{}
-		for _, f := range msg.Fields {
-			if ok := seen[f.Order]; ok {
-				log.Fatalf("Duplicate Field IDs on versioned struct: %s", msg.Name)
+
+		log.Printf("Parsing Package: %s", pkg.Name)
+
+		pkgs[pkg.Name] = &generate.ParsedPkg{
+			Name:       pkg.Name,
+			Pkg:        pkg,
+			Imports:    map[string]struct{}{},
+			Messages:   []generate.Message{},
+			Enums:      []generate.Enum{},
+			MessageMap: map[string]generate.Message{},
+			EnumMap:    map[string]generate.Enum{},
+		}
+
+		// Parse imports first
+		for _, impt := range pkg.Imports {
+			if _, ok := pkgs[impt]; ok {
+				continue
 			}
-			seen[f.Order] = true
+			importedPkg, err := bc.Import(impt, pkgpath, 0)
+			if err != nil {
+				log.Fatalf("Failed to import: %s", err)
+			}
+			if importedPkg.Goroot {
+				// We wont write serializers into goroot.
+				continue
+			}
+			parsePkg(importedPkg)
+		}
+
+		// Now parse this package's files
+		for _, fname := range pkg.GoFiles {
+			if !filepath.IsAbs(fname) { // name might be absolute if specified directly. E.g., `gopherjs build /abs/file.go`.
+				fname = filepath.Join(pkg.Dir, fname)
+			}
+			r, err := buildutil.OpenFile(bc, fname)
+			if err != nil {
+				panic(err)
+			}
+			file, err := parser.ParseFile(fset, fname, r, parser.ParseComments)
+			if err != nil {
+				panic(err)
+			}
+			r.Close()
+			parseFile(file, pkgs[pkg.Name])
 		}
 	}
 
-	if outdir == nil || *outdir == "" {
-		outdir = dir
+	parsePkg(pkg)
+
+	// Validates strut field versions and connects message type pointers.
+	for _, pkg := range pkgs {
+		for _, msg := range pkg.Messages {
+			if msg.Versioned {
+				sort.Slice(msg.Fields, func(i int, j int) bool {
+					return msg.Fields[i].Order < msg.Fields[j].Order
+				})
+				seen := map[int]bool{}
+				for _, f := range msg.Fields {
+					if ok := seen[f.Order]; ok {
+						log.Fatalf("Duplicate Field IDs on versioned struct: %s", msg.Name)
+					}
+					seen[f.Order] = true
+				}
+			}
+			for i, mf := range msg.Fields {
+				fieldPkg := mf.RemotePackage
+				if fieldPkg == "" {
+					fieldPkg = msg.Package
+				}
+				opkg := pkgs[fieldPkg]
+				if mf.RemotePackage != "" {
+					// Only include remote packages.
+					pkg.Imports[opkg.Pkg.ImportPath] = struct{}{}
+				}
+				if opkg != nil {
+					omsg, hasMessage := opkg.MessageMap[mf.Type]
+					if hasMessage {
+						msg.Fields[i].MsgType = &omsg
+						continue
+					}
+					fmt.Printf("PostProcess, Msg: %s, Field: %s, Type: %s\n", msg.Name, mf.Name, mf.Type)
+					oen, ok := opkg.EnumMap[mf.Type]
+					if ok {
+						msg.Fields[i].EnumType = &oen
+						continue
+					}
+					fmt.Printf("\tCouldn't link %s to an enum or msg type...\n", mf.Name)
+				}
+			}
+		}
 	}
 
 	for _, l := range strings.Split(*genlist, ",") {
-		switch l {
-		case "go":
-			// outpkg := filepath.Base(*outdir)
-			buf := &bytes.Buffer{}
-			buf.WriteString(generate.GoLibHeader(pkgname, messages, messageMap, enums, enumMap))
-
-			for _, msg := range messages {
-				buf.WriteString(generate.GoDeserializers(msg, messages, messageMap, enums, enumMap))
+		for name, pkg := range pkgs {
+			if pkg.Pkg == nil {
+				continue
 			}
-
-			ioutil.WriteFile(filepath.Join(filepath.Join(wd, *outdir), "ngenDeserial.go"), buf.Bytes(), 0644)
-
-			buf.Reset()
-			buf.WriteString(fmt.Sprintf("%spackage %s\n\nimport \"github.com/lologarithm/netgen/lib/ngen\"", generate.HeaderComment(), pkgname))
-			for _, msg := range messages {
-				buf.WriteString(generate.GoSerializers(msg, messages, messageMap, enums, enumMap))
+			pkgdir := *outdir
+			if pkgdir == "" {
+				pkgdir = pkg.Pkg.Dir
+			} else if pkgdir[0] == '.' {
+				pkgdir = filepath.Join(wd, pkgdir)
 			}
-			ioutil.WriteFile(filepath.Join(pkgpath, "ngenSerial.go"), buf.Bytes(), 0644)
-		case "js":
-			jsfile := generate.WriteJSConverter(pkgname, messages, messageMap, enums, enumMap)
-			rootpkg := filepath.Join(wd, *outdir)
-			ioutil.WriteFile(path.Join(rootpkg, "ngenjs.go"), jsfile, 0666)
+			log.Printf("Now writing package: '%s' at '%s'", name, pkgdir)
+			switch l {
+			case "go":
+				buf := &bytes.Buffer{}
+				buf.WriteString(generate.GoLibHeader(pkg))
 
-		case "cs":
-			// generate.WriteCS(messages, messageMap)
+				for _, msg := range pkg.Messages {
+					fmt.Printf("Writing deserializers for %s.%s\n", pkg.Name, msg.Name)
+					buf.WriteString(generate.GoDeserializers(msg))
+				}
+
+				// log.Printf("Contents: %s", string(buf.Bytes()))
+				ioutil.WriteFile(filepath.Join(pkgdir, "ngenDeserial.go"), buf.Bytes(), 0644)
+				buf.Reset()
+				buf.WriteString(fmt.Sprintf("%s\npackage %s\n\nimport \"github.com/lologarithm/netgen/lib/ngen\"", generate.HeaderComment(), pkg.Name))
+				for _, msg := range pkg.Messages {
+					buf.WriteString(generate.GoSerializers(msg))
+				}
+				ioutil.WriteFile(filepath.Join(pkgdir, "ngenSerial.go"), buf.Bytes(), 0644)
+			case "js":
+				jsfile := generate.WriteJSConverter(pkg)
+				log.Printf("Now writing %s", path.Join(pkgdir, "ngen_js.go"))
+				ioutil.WriteFile(path.Join(pkgdir, "ngen_js.go"), jsfile, 0666)
+			case "cs":
+				// generate.WriteCS(messages, messageMap)
+			}
 		}
 	}
 }
@@ -273,18 +354,19 @@ func main() {
 //  identifier type
 //  isArray
 //  isPointer
-func getidenttype(e ast.Expr, isArray bool, isPointer bool) (*ast.Ident, bool, bool) {
+func getidenttype(e ast.Expr, isArray bool, isPointer bool) (*ast.Ident, *ast.Ident, bool, bool) {
 	switch itf := e.(type) {
 	case *ast.Ident:
-		return itf, isArray, isPointer
+		return nil, itf, isArray, isPointer
 	case *ast.ArrayType:
 		return getidenttype(itf.Elt, true, false)
 	case *ast.StarExpr:
 		return getidenttype(itf.X, isArray, true)
 	case *ast.SelectorExpr:
-		return itf.Sel, isArray, isPointer
+		_, xv, _, _ := getidenttype(itf.X, false, false)
+		return xv, itf.Sel, isArray, isPointer
 	default:
 		fmt.Printf("failed to handle a field type! %T, %#v\n", itf, itf)
 	}
-	return nil, false, false
+	return nil, nil, false, false
 }
