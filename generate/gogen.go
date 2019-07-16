@@ -122,8 +122,23 @@ func GoSerializers(msg Message) string {
 	gobuf.WriteString("\n\treturn buffer.Err\n}\n")
 	// TODO: Write the router Len function.
 	gobuf.WriteString(fmt.Sprintf("\nfunc (m %s) Length(ctx *ngen.Context) int {\n\tmylen := 0\n", msg.Name))
-	for _, f := range msg.Fields {
-		WriteGoLen(f, 1, gobuf)
+	if msg.Versioned {
+		// If versioned we need to switch on the field indexes
+		fldSwitch := &bytes.Buffer{}
+		for _, f := range msg.Fields {
+			fldSwitch.WriteString(fmt.Sprintf("\t\t\tcase %d:\n", f.Order))
+			WriteGoLen(f, 1, fldSwitch)
+		}
+		gobuf.WriteString(fmt.Sprintf(
+			`	for _, fld := range ctx.FieldVersions[%d] {
+			switch fld {
+	%s		}
+			}
+	`, MessageID(msg), fldSwitch.String()))
+	} else {
+		for _, f := range msg.Fields {
+			WriteGoLen(f, 1, gobuf)
+		}
 	}
 	gobuf.WriteString("\treturn mylen\n}\n\n")
 

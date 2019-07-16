@@ -27,7 +27,7 @@ var dir = flag.String("dir", "", "Input directory to transpile")
 var outdir = flag.String("out", "", "Output directory for deserializer package")
 var version = flag.Bool("version", false, "Prints the version")
 
-var verNum = "0.0.1"
+var verNum = "1.0.0"
 
 func main() {
 	flag.Parse()
@@ -342,7 +342,6 @@ func main() {
 			case "js":
 				jsfile := generate.WriteJSConverter(pkg)
 				log.Printf("Now writing %s", path.Join(pkgdir, "ngen_js.go"))
-				fmt.Printf("JSFile:\n%s\n", jsfile)
 				ioutil.WriteFile(path.Join(pkgdir, "ngen_js.go"), jsfile, 0666)
 			case "cs":
 				// generate.WriteCS(messages, messageMap)

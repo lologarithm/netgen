@@ -22,6 +22,7 @@ func main() {
 	} // ngex.newClient()
 	c.CEvents.OnConnected(func(arg1 bool) {
 		c.Outgoing <- newmodels.Message{Message: "Hello World."} // c.SendMessage({Message:"Hello World"})
+		c.Outgoing <- newmodels.VersionedMessage{Message: "Version Hello World!", From: "The Client", NewHotness: 42.0}
 	})
 	c.Dial("")
 }
@@ -41,6 +42,8 @@ func runClient(c *Client) {
 		switch msg.MsgType() {
 		case newmodels.MessageMsgType:
 			print("Got message: ", msg.(*newmodels.Message).Message, "\n")
+		case newmodels.VersionedMessageMsgType:
+			print("Got message: ", msg)
 		}
 	}
 	print("Got nil packet, shutting down client reader.\n")

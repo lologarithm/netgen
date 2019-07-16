@@ -7,8 +7,9 @@ type Message struct {
 }
 
 type VersionedMessage struct {
-	Message string `ngen:"1"`
-	From    string `ngen:"2"`
+	Message     string `ngen:"1"`
+	From        string `ngen:"2"`
+	UselessData int    `ngen:"3"`
 }
 
 // SuperMessage can have a secret.

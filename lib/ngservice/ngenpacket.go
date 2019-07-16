@@ -1,6 +1,8 @@
 package ngservice
 
-import "github.com/lologarithm/netgen/lib/ngen"
+import (
+	"github.com/lologarithm/netgen/lib/ngen"
+)
 
 const headerLen int = 6
 

@@ -57,7 +57,7 @@ func Reader(c *Client, local *ngen.Context, remote chan *ngen.Context) {
 			continue
 		}
 
-		if p.Header.MsgType == 1 {
+		if p.Header.MsgType == ngen.MessageTypeContext {
 			fmt.Printf("Got remote settings: %#v\n", p.NetMsg)
 			remoteSettings = p.NetMsg.(*ngen.Context)
 			remote <- remoteSettings // send to 'sender' channel now
