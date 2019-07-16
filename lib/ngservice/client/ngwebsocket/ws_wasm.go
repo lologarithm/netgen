@@ -1,21 +1,19 @@
-// +build !wasm
-
 package ngwebsocket
 
 import (
 	"errors"
+	"syscall/js"
 	"time"
 
-	"github.com/gopherjs/gopherjs/js"
 	"github.com/lologarithm/netgen/lib/ngen"
 	"github.com/lologarithm/netgen/lib/ngservice/client"
 )
 
 // New has _ to follow the pattern from the Go client.
 func New(url, _ string, onConnect func()) (*client.Client, error) {
-	conn := js.Global.Get("WebSocket").New(url)
+	conn := js.Global().Get("WebSocket").New(url)
 	conn.Set("binaryType", "arraybuffer")
-	conn.Call("addEventListener", "open", func(ev *js.Object) { onConnect() }, false)
+	conn.Call("addEventListener", "open", js.FuncOf(func(this js.Value, args []js.Value) interface{} { onConnect(); return nil }), false)
 
 	ws := &wsjs{
 		conn:     conn,
@@ -24,15 +22,20 @@ func New(url, _ string, onConnect func()) (*client.Client, error) {
 		framebuf: make(chan []byte, 2), // can hold 2 frames
 	}
 
-	onMessage := func(ev *js.Object) {
-		jsarr := js.Global.Get("Uint8Array").New(ev.Get("data"))
-		slice := jsarr.Interface().([]byte)
+	onMessage := func(this js.Value, args []js.Value) interface{} {
+		data := args[0].Get("data")
+		slice := make([]byte, data.Get("byteLength").Int())
+		view := js.Global().Get("Uint8Array").New(data)
+		for i := range slice {
+			slice[i] = byte(view.Index(i).Int())
+		}
 		go func() {
 			ws.framebuf <- slice
 		}()
+		return nil
 	}
 
-	conn.Call("addEventListener", "message", onMessage, false)
+	conn.Call("addEventListener", "message", js.FuncOf(onMessage), false)
 
 	return &client.Client{
 		Conn:     ws,
@@ -42,7 +45,7 @@ func New(url, _ string, onConnect func()) (*client.Client, error) {
 }
 
 type wsjs struct {
-	conn     *js.Object
+	conn     js.Value
 	buffer   []byte
 	idx      int
 	framebuf chan []byte
@@ -88,6 +91,6 @@ func (ws *wsjs) Write(p []byte) (int, error) {
 			panic(e)
 		}
 	}()
-	ws.conn.Call("send", p)
+	ws.conn.Call("send", js.TypedArrayOf(p))
 	return len(p), err
 }
