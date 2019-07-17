@@ -288,8 +288,13 @@ func main() {
 				}
 				opkg := pkgs[fieldPkg]
 				if mf.RemotePackage != "" {
-					// Only include remote packages.
-					pkg.Imports[opkg.Pkg.ImportPath] = struct{}{}
+					if opkg == nil {
+						// Hopefully its just a system package.
+						pkg.Imports[mf.RemotePackage] = struct{}{}
+					} else {
+						// Only include remote packages.
+						pkg.Imports[opkg.Pkg.ImportPath] = struct{}{}
+					}
 				}
 				if opkg != nil {
 					omsg, hasMessage := opkg.MessageMap[mf.Type]
