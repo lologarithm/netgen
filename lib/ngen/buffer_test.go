@@ -62,6 +62,12 @@ func TestBasicBuffer(t *testing.T) {
 	}
 	buf.Reset()
 
+	buf.WriteFloat32(0)
+	if buf.Err != io.EOF {
+		t.Fatalf("Didn't fail when expected when WriteFloat32 to buffer: %s", buf.Err)
+	}
+	buf.Reset()
+
 	buf.WriteFloat64(0)
 	if buf.Err != io.EOF {
 		t.Fatalf("Didn't fail when expected when WriteFloat64 to buffer: %s", buf.Err)
@@ -80,10 +86,11 @@ func TestBasicBuffer(t *testing.T) {
 	}
 	buf.Reset()
 
-	buf = NewBuffer(make([]byte, 32))
+	buf = NewBuffer(make([]byte, 36))
 	buf.WriteByteSlice([]byte{1, 2, 3})
 	buf.WriteUint64(12)
 	buf.WriteFloat64(123.456)
+	buf.WriteFloat32(654.321)
 	buf.WriteString("hello")
 	if buf.Err != nil {
 		t.Fatalf("Failed to serialize buffer: %s", buf.Err)
@@ -100,6 +107,9 @@ func TestBasicBuffer(t *testing.T) {
 	}
 	if buf.ReadFloat64() != 123.456 {
 		t.Fatalf("Failed to float64 back out of buffer: %#v, %s", buf, buf.Err)
+	}
+	if buf.ReadFloat32() != 654.321 {
+		t.Fatalf("Failed to float32 back out of buffer: %#v, %s", buf, buf.Err)
 	}
 	if buf.ReadString() != "hello" {
 		t.Fatalf("Failed to read string back out of buffer: %#v, %s", buf, buf.Err)
