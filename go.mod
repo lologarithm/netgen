@@ -5,3 +5,5 @@ require (
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
 	golang.org/x/tools v0.0.0-20190711191110-9a621aea19f8
 )
+
+go 1.13

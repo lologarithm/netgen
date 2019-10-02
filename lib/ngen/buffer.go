@@ -140,12 +140,12 @@ func (b *Buffer) ReadFloat32() float32 {
 	if b.Err != nil {
 		return 0
 	}
-	if len(b.Buf) < int(b.Loc+8) {
+	if len(b.Buf) < int(b.Loc+4) {
 		b.Err = io.EOF
 		return 0
 	}
 	v := Float32(b.Buf[b.Loc:])
-	b.Loc += 8
+	b.Loc += 4
 	return v
 }
 
@@ -313,7 +313,7 @@ func (b *Buffer) WriteFloat32(v float32) {
 	if b.Err != nil {
 		return
 	}
-	if len(b.Buf) < int(b.Loc+8) {
+	if len(b.Buf) < int(b.Loc+4) {
 		b.Err = io.EOF
 		return
 	}
