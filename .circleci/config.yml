@@ -6,7 +6,7 @@ jobs:
   build:
     docker:
       # specify the version
-      - image: circleci/golang:1.12.6
+      - image: circleci/golang:1.13.1
     working_directory: /go/src/github.com/lologarithm/netgen
     steps:
       - checkout
@@ -15,4 +15,3 @@ jobs:
       - run: netgen --dir=./example/newmodels
       - run: netgen --dir=./example/models
       - run: GO111MODULE=on go test -v ./...
-      # - run: gopherjs test -v ./ngen/...
