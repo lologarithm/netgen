@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+// TODO: Write a version of this to support webassembly (syscall/js) to read messages from javascript objects.
+// This would allow a webassembly network client and javascript controller logic.
+// This is not needed to support a pure webassembly client.
+
 func WriteJSConverter(pkg *ParsedPkg) []byte {
 	buf := &bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("%s\npackage %s\n\nimport (\n\t\"github.com/gopherjs/gopherjs/js\"\n\t\"github.com/lologarithm/netgen/lib/ngen\"\n)\n\n", HeaderComment(), pkg.Name))

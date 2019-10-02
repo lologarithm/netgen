@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"syscall/js"
 
 	"github.com/lologarithm/netgen/example/newmodels"
 	"github.com/lologarithm/netgen/lib/ngservice/client"
@@ -11,28 +10,18 @@ import (
 
 func main() {
 	print("Starting!\n")
-	js.Global().Set("ngex", map[string]interface{}{
-		// "newClient": newClient,
-	})
 	blocker := make(chan bool)
 	c := &Client{
 		CEvents: &Events{},
 	} // ngex.newClient()
 	c.CEvents.OnConnected(func(arg1 bool) {
-		c.Outgoing <- newmodels.Message{Message: "Hello World."} // c.SendMessage({Message:"Hello World"})
+		c.Outgoing <- newmodels.Message{Message: "Hello World."}
 		c.Outgoing <- newmodels.VersionedMessage{Message: "Version Hello World!", From: "The Client", NewHotness: 42.0}
 		print("Connected...\n")
 	})
 	c.Dial("")
 	<-blocker
 }
-
-// func newClient() js.Value {
-// 	c := &Client{
-// 		CEvents: &Events{},
-// 	}
-// 	return js.ValueOf(c)
-// }
 
 func runClient(c *Client) {
 	for msg := range c.Incoming {
@@ -63,8 +52,8 @@ func (ce *Events) OnConnected(cb func(bool)) {
 	ce.connected = cb
 }
 
-// // Events exposes a set of callbacks that the controller logic can
-// // register for.
+// If implementing a go network client but js controller, you would expose event objects.
+// // Events exposes a set of callbacks that the controller logic can register for.
 // func (c *Client) Events() js.Value {
 // 	return js.MakeWrapper(c.CEvents)
 // }
