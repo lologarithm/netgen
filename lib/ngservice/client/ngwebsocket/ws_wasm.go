@@ -26,9 +26,7 @@ func New(url, _ string, onConnect func()) (*client.Client, error) {
 		data := args[0].Get("data")
 		slice := make([]byte, data.Get("byteLength").Int())
 		view := js.Global().Get("Uint8Array").New(data)
-		for i := range slice {
-			slice[i] = byte(view.Index(i).Int())
-		}
+		js.CopyBytesToGo(slice, view)
 		go func() {
 			ws.framebuf <- slice
 		}()
@@ -91,6 +89,12 @@ func (ws *wsjs) Write(p []byte) (int, error) {
 			panic(e)
 		}
 	}()
-	ws.conn.Call("send", js.TypedArrayOf(p))
-	return len(p), err
+
+	view := js.Global().Get("Uint8Array").New(len(p))
+	num := js.CopyBytesToJS(view, p)
+	if num != len(p) {
+		err = errors.New("failed to copy bytes all bytes to js for network transmission")
+	}
+	ws.conn.Call("send", view)
+	return num, err
 }
