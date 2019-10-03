@@ -19,7 +19,7 @@ func main() {
 		c.Outgoing <- newmodels.VersionedMessage{Message: "Version Hello World!", From: "The Client", NewHotness: 42.0}
 		print("Connected...\n")
 	})
-	c.Dial("")
+	c.Dial("ws://127.0.0.1:4567/ws") // example/server websocket endpoint
 	<-blocker
 }
 
@@ -67,13 +67,8 @@ func (ce *Events) OnConnected(cb func(bool)) {
 // }
 
 func (c *Client) Dial(url string) {
-	origin := ""
-	if url == "" {
-		url = "ws://127.0.0.1:4567/ws"
-		origin = "http://127.0.0.1/"
-	}
 	var err error
-	c.Client, err = ngwebsocket.New(url, origin, func() {
+	c.Client, err = ngwebsocket.New(url, "", func() {
 		print("Connection active. starting client now.\n")
 		if c.CEvents != nil && c.CEvents.connected != nil {
 			c.CEvents.connected(true)
